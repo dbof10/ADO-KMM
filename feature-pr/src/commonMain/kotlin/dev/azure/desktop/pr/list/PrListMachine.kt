@@ -2,14 +2,12 @@ package dev.azure.desktop.pr.list
 
 import com.freeletics.flowredux.dsl.FlowReduxStateMachine
 import dev.azure.desktop.domain.pr.DevOpsProject
-import dev.azure.desktop.domain.pr.GetDefaultProjectNameUseCase
 import dev.azure.desktop.domain.pr.GetActivePullRequestsUseCase
 import dev.azure.desktop.domain.pr.GetMyPullRequestsUseCase
 import dev.azure.desktop.domain.pr.FindPullRequestSummaryByIdUseCase
 import dev.azure.desktop.domain.pr.GetPullRequestSummaryByIdUseCase
 import dev.azure.desktop.domain.pr.ListProjectsUseCase
 import dev.azure.desktop.domain.pr.PullRequestSummary
-import dev.azure.desktop.domain.pr.RecordProjectSelectedUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 enum class PrListTab {
@@ -68,8 +66,6 @@ class PrListStateMachine(
     private val getActivePullRequestsUseCase: GetActivePullRequestsUseCase,
     private val findPullRequestSummaryByIdUseCase: FindPullRequestSummaryByIdUseCase,
     private val getPullRequestSummaryByIdUseCase: GetPullRequestSummaryByIdUseCase,
-    private val getDefaultProjectNameUseCase: GetDefaultProjectNameUseCase,
-    private val recordProjectSelectedUseCase: RecordProjectSelectedUseCase,
 ) : FlowReduxStateMachine<PrListState, PrListAction>(PrListState.LoadingProjects) {
     init {
         spec {
@@ -78,17 +74,10 @@ class PrListStateMachine(
                     listProjectsUseCase(organization).fold(
                         onSuccess = { projects ->
                             val sorted = projects.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
-                            val persistedDefault =
-                                getDefaultProjectNameUseCase(organization, sorted.map { it.name }).getOrNull()
-                            val fallbackDefault = sorted.firstOrNull()?.name
-                            val defaultProject = persistedDefault ?: fallbackDefault
-                            println(
-                                "[ProjectSelection] default org='${organization.trim()}' persisted='$persistedDefault' fallback='$fallbackDefault' chosen='$defaultProject' projects=${sorted.size}",
-                            )
                             state.override {
                                 PrListState.LoadingPullRequests(
                                     projects = sorted,
-                                    selectedProjectName = defaultProject,
+                                    selectedProjectName = null,
                                     tab = PrListTab.Mine,
                                 )
                             }
@@ -144,12 +133,6 @@ class PrListStateMachine(
                 }
                 on<PrListAction.SelectProject> { action, state ->
                     val snap = state.snapshot
-                    // Treat this action as a user-driven selection intent.
-                    // Even selecting the currently-selected project should increase its priority for future defaults.
-                    println(
-                        "[ProjectSelection] userSelect org='${organization.trim()}' from='${snap.selectedProjectName}' to='${action.projectName}' changed=${action.projectName != snap.selectedProjectName}",
-                    )
-                    action.projectName?.let { recordProjectSelectedUseCase(organization, it) }
                     if (action.projectName == snap.selectedProjectName) {
                         state.noChange()
                     } else {
@@ -245,7 +228,6 @@ class PrListStateMachine(
                 }
                 on<PrListAction.SelectProject> { action, state ->
                     val snap = state.snapshot
-                    action.projectName?.let { recordProjectSelectedUseCase(organization, it) }
                     if (action.projectName == snap.selectedProjectName) {
                         state.noChange()
                     } else {
@@ -287,7 +269,6 @@ class PrListStateMachine(
                 }
                 on<PrListAction.SelectProject> { action, state ->
                     val snap = state.snapshot
-                    action.projectName?.let { recordProjectSelectedUseCase(organization, it) }
                     if (action.projectName == snap.selectedProjectName) {
                         state.noChange()
                     } else {

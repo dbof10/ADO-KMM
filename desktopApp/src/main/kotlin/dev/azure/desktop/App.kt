@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
@@ -30,6 +31,7 @@ import dev.azure.desktop.ui.screens.PrListScreen
 import dev.azure.desktop.ui.screens.PrOverviewScreen
 import dev.azure.desktop.ui.shell.MainShell
 import javax.swing.SwingUtilities
+import kotlinx.coroutines.launch
 
 @Composable
 fun App() {
@@ -56,8 +58,6 @@ fun App() {
                 getActivePullRequestsUseCase = JvmPullRequestServices.getActivePullRequestsUseCase,
                 findPullRequestSummaryByIdUseCase = JvmPullRequestServices.findPullRequestSummaryByIdUseCase,
                 getPullRequestSummaryByIdUseCase = JvmPullRequestServices.getPullRequestSummaryByIdUseCase,
-                getDefaultProjectNameUseCase = JvmPullRequestServices.getDefaultProjectNameUseCase,
-                recordProjectSelectedUseCase = JvmPullRequestServices.recordProjectSelectedUseCase,
             )
         }
         val prDetailStateMachine = remember(selectedPullRequest, organization, loginMachineEpoch) {
@@ -163,6 +163,7 @@ fun App() {
                             LaunchedEffect(detailMachine) {
                                 detailMachine.state.collect { detailState = it }
                             }
+                            val scope = rememberCoroutineScope()
                             when (val current = detailState) {
                                 PrDetailState.Loading -> CircularProgressIndicator()
 
@@ -173,8 +174,8 @@ fun App() {
                                         detail = current.detail,
                                         isVoting = current.isVoting,
                                         voteErrorMessage = current.voteErrorMessage,
-                                        onApprove = { detailMachine.dispatch(PrDetailAction.Approve) },
-                                        onReject = { detailMachine.dispatch(PrDetailAction.Reject) },
+                                        onApprove = { scope.launch { detailMachine.dispatch(PrDetailAction.Approve) } },
+                                        onReject = { scope.launch { detailMachine.dispatch(PrDetailAction.Reject) } },
                                         modifier = Modifier.fillMaxSize(),
                                     )
                             }

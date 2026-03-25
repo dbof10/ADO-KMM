@@ -4,27 +4,11 @@ import dev.azure.desktop.domain.auth.PatStorage
 import dev.azure.desktop.domain.auth.VerifyAndStorePatUseCase
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
-import io.ktor.client.plugins.logging.LogLevel
-import io.ktor.client.plugins.logging.Logger
-import io.ktor.client.plugins.logging.Logging
-import io.ktor.http.HttpHeaders
 import java.util.concurrent.atomic.AtomicReference
-
-private val networkLogger =
-    object : Logger {
-        override fun log(message: String) {
-            println("[ADO-HTTP] $message")
-        }
-    }
 
 private fun baseHttpClient(): HttpClient =
     HttpClient(CIO) {
         followRedirects = true
-        install(Logging) {
-            logger = networkLogger
-            level = LogLevel.INFO
-            sanitizeHeader { name -> name.equals(HttpHeaders.Authorization, ignoreCase = true) }
-        }
     }
 
 object JvmAuthServices {

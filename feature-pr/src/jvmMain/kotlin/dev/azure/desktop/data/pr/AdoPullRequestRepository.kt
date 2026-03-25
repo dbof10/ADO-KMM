@@ -13,6 +13,7 @@ import dev.azure.desktop.domain.pr.PullRequestTimelineItem
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.request
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
@@ -395,7 +396,8 @@ class AdoPullRequestRepository(
                 httpClient.request(url) {
                     method = HttpMethod.Put
                     headers.append(HttpHeaders.Authorization, basicAuth())
-                    body = TextContent("""{"vote":$vote}""", ContentType.Application.Json)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"vote":$vote}""")
                 }
 
             require(response.status.isSuccess()) {

@@ -220,7 +220,7 @@ private fun TimelineComment(item: PullRequestTimelineItem.Comment) {
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    item.content,
+                    formatTimelineContent(item.content),
                     style = MaterialTheme.typography.bodySmall,
                     color = EditorialColors.onSurfaceVariant,
                 )
@@ -233,6 +233,26 @@ private fun TimelineComment(item: PullRequestTimelineItem.Comment) {
         }
     }
 }
+
+private val voteLineRegex = Regex("""\bvoted\s+(-?\d+)\b""", RegexOption.IGNORE_CASE)
+
+private fun formatTimelineContent(content: String): String {
+    val match = voteLineRegex.find(content) ?: return content
+    val vote = match.groupValues.getOrNull(1)?.toIntOrNull() ?: return content
+    val voteLabel = voteLabel(vote)
+    return content.replace(voteLineRegex) { mr ->
+        val prefix = mr.value.substringBefore("voted", missingDelimiterValue = "")
+        "${prefix}voted $voteLabel"
+    }
+}
+
+private fun voteLabel(vote: Int): String =
+    when {
+        vote >= 10 -> "Approved"
+        vote in 1..9 -> "Approved with suggestions"
+        vote < 0 -> "Rejected"
+        else -> "Waiting"
+    }
 
 @Composable
 private fun TimelineApproval(item: PullRequestTimelineItem.Approval) {
@@ -349,13 +369,19 @@ private fun PullRequestReviewer.readableName(): String {
 
 @Composable
 private fun ReviewerStatusBadge(vote: Int) {
-    val approved = vote >= 10
-    val label = if (approved) "Approved" else "Waiting"
-    val tint = if (approved) EditorialColors.primary else EditorialColors.outline
+    val (label, tint, icon) =
+        when {
+            vote >= 10 -> Triple("Approved", EditorialColors.primary, Icons.Filled.CheckCircle)
+            vote in 1..9 -> Triple("Approved with suggestions", EditorialColors.tertiary, Icons.Outlined.Check)
+            vote < 0 -> Triple("Rejected", EditorialColors.error, Icons.Outlined.ErrorOutline)
+            else -> Triple("Waiting", EditorialColors.outline, Icons.Outlined.Schedule)
+        }
 
     Surface(
         shape = RoundedCornerShape(999.dp),
-        color = (if (approved) EditorialColors.primary else EditorialColors.surfaceContainerHighest).copy(alpha = 0.12f),
+        color =
+            (if (vote >= 10) EditorialColors.primary else EditorialColors.surfaceContainerHighest)
+                .copy(alpha = 0.12f),
         contentColor = tint,
     ) {
         Row(
@@ -364,7 +390,7 @@ private fun ReviewerStatusBadge(vote: Int) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                if (approved) Icons.Filled.CheckCircle else Icons.Outlined.Schedule,
+                icon,
                 contentDescription = null,
                 tint = tint,
                 modifier = Modifier.size(16.dp),
