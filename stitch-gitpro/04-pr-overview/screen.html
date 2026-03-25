@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Engineering Editorial | Pull Request #1204</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-container-highest": "#e3e2e1",
+                        "on-error": "#ffffff",
+                        "surface": "#faf9f8",
+                        "on-error-container": "#93000a",
+                        "surface-container": "#efeeed",
+                        "primary": "#005faa",
+                        "primary-container": "#0078d4",
+                        "on-primary": "#ffffff",
+                        "primary-fixed": "#d3e3ff",
+                        "surface-container-lowest": "#ffffff",
+                        "inverse-on-surface": "#f1f0ef",
+                        "on-tertiary-fixed-variant": "#743500",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed": "#ffdbc8",
+                        "on-primary-fixed-variant": "#004883",
+                        "inverse-primary": "#a3c9ff",
+                        "secondary-fixed-dim": "#c8c6c5",
+                        "on-tertiary-container": "#ffffff",
+                        "background": "#faf9f8",
+                        "on-surface-variant": "#404752",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "secondary-container": "#e4e2e1",
+                        "outline": "#717783",
+                        "on-secondary-fixed": "#1b1c1c",
+                        "on-background": "#1a1c1c",
+                        "primary-fixed-dim": "#a3c9ff",
+                        "on-surface": "#1a1c1c",
+                        "outline-variant": "#c0c7d4",
+                        "surface-container-low": "#f4f3f2",
+                        "on-primary-fixed": "#001c39",
+                        "tertiary": "#974700",
+                        "inverse-surface": "#2f3130",
+                        "surface-tint": "#0060ab",
+                        "surface-container-high": "#e9e8e7",
+                        "error": "#ba1a1a",
+                        "on-secondary-fixed-variant": "#474746",
+                        "tertiary-container": "#bc5b00",
+                        "surface-bright": "#faf9f8",
+                        "surface-variant": "#e3e2e1",
+                        "on-tertiary-fixed": "#311300",
+                        "secondary-fixed": "#e4e2e1",
+                        "on-primary-container": "#ffffff",
+                        "secondary": "#5f5e5e",
+                        "tertiary-fixed-dim": "#ffb689",
+                        "on-secondary-container": "#656464",
+                        "surface-dim": "#dadad9"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        .glass-panel {
+            background: rgba(227, 226, 225, 0.9);
+            backdrop-filter: blur(12px);
+        }
+        .cta-gradient {
+            background: linear-gradient(135deg, #005faa 0%, #0078d4 100%);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- SideNavBar (Predicted Anchor) -->
+<aside class="fixed left-0 top-0 h-full z-40 h-screen w-20 flex flex-col border-r-0 bg-slate-100 dark:bg-zinc-900 font-sans Inter tracking-tight">
+<div class="flex flex-col items-center py-6 gap-8 flex-1">
+<div class="text-lg font-bold tracking-widest uppercase text-slate-900 dark:text-slate-100">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">architecture</span>
+</div>
+<nav class="flex flex-col items-center gap-4 w-full">
+<!-- Overview: Active Tab -->
+<button class="w-12 h-12 flex items-center justify-center transition-transform scale-95 active:scale-90 bg-blue-600/10 text-blue-700 dark:text-blue-400 border-r-4 border-blue-600" title="Overview">
+<span class="material-symbols-outlined">dashboard</span>
+</button>
+<button class="w-12 h-12 flex items-center justify-center transition-all text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-200 dark:hover:bg-zinc-800" title="Files">
+<span class="material-symbols-outlined">description</span>
+</button>
+<button class="w-12 h-12 flex items-center justify-center transition-all text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-200 dark:hover:bg-zinc-800" title="Commits">
+<span class="material-symbols-outlined">history</span>
+</button>
+<button class="w-12 h-12 flex items-center justify-center transition-all text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-200 dark:hover:bg-zinc-800" title="Updates">
+<span class="material-symbols-outlined">update</span>
+</button>
+</nav>
+</div>
+<div class="flex flex-col items-center py-6 gap-4 bg-slate-200 dark:bg-zinc-800">
+<button class="w-12 h-12 flex items-center justify-center text-slate-500 hover:text-slate-900" title="Settings">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<button class="w-12 h-12 flex items-center justify-center text-slate-500 hover:text-slate-900" title="Support">
+<span class="material-symbols-outlined">help</span>
+</button>
+<img alt="User Profile Avatar" class="w-10 h-10 rounded-full border-2 border-primary-fixed" data-alt="Close-up professional portrait of a software architect in a modern office with soft natural lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAW_6m-xFRVD8qc1KVgIegtSL5lk0Hk2HgqyS3of432zy3jYxFEmGoR64KY9BqwbJYFUuD2XAbxZITug-z1l3a3E_Jc3hZ347Q-xLmgKt96QodB-Q7aWuSon5SuW4H8qooA99aDqmDK97rPdol3URDPGrPM1cFOuQ-xjF-qRQF6TyM02Q9Y0n4REAwJcuZChCs5vLSLWi4DVpthXubra2tZQdF52eFhH9CghG6j9blKPKDDArcuCRArsjvp2m4cCLBtSH1Uvmexoa-P"/>
+</div>
+</aside>
+<!-- TopAppBar (Predicted Anchor) -->
+<header class="sticky top-0 right-0 w-[calc(100%-5rem)] ml-20 z-50 flex items-center px-6 w-full h-16 border-b-0 bg-slate-50/90 dark:bg-zinc-950/90 backdrop-blur-xl shadow-sm dark:shadow-none headline-sm font-semibold Inter">
+<div class="flex items-center gap-8 w-full">
+<div class="text-xl font-black tracking-tighter text-slate-900 dark:text-white">The Engineering Editorial</div>
+<div class="flex-1 flex items-center bg-surface-container rounded-lg px-3 py-1.5 max-w-md">
+<span class="material-symbols-outlined text-outline text-sm">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm w-full font-normal" placeholder="Search work items..." type="text"/>
+</div>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-blue-600 dark:text-blue-400 font-bold border-b-2 border-blue-600 h-16 flex items-center" href="#">Pull Requests</a>
+<a class="text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white transition-all" href="#">Repositories</a>
+<a class="text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white transition-all" href="#">Pipelines</a>
+</nav>
+<div class="ml-auto flex items-center gap-4">
+<button class="text-slate-600 hover:text-blue-500 transition-all"><span class="material-symbols-outlined">notifications</span></button>
+<button class="text-slate-600 hover:text-blue-500 transition-all"><span class="material-symbols-outlined">history</span></button>
+<button class="cta-gradient text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md active:opacity-70 transition-all">Create PR</button>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-20 min-h-screen bg-surface-container-low p-8">
+<div class="max-w-7xl mx-auto">
+<!-- PR Header Row -->
+<div class="flex flex-col gap-2 mb-8">
+<div class="flex items-center gap-3">
+<span class="bg-primary-fixed text-on-primary-fixed px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase">Active</span>
+<span class="text-outline text-sm font-medium">PR #1204</span>
+</div>
+<h1 class="text-3xl font-extrabold tracking-tight text-on-surface">Refactor Cloud-Native Service Mesh Architecture</h1>
+<div class="flex items-center gap-4 text-sm text-on-surface-variant">
+<div class="flex items-center gap-1.5">
+<img class="w-5 h-5 rounded-full" data-alt="Senior developer profile photo, friendly expression, urban indoor setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCTJMB85-aCI__nd6ivxDQm8VoXPv1hw_34YIPhjsJk3ZwLo-IETcmAqOTnd1MmTvcYTD20hjE-8yC9tF_udxB_vqJ0f4EnxSfr8-izn9f-LSH4I4Nlk_5h8GFxwNqMZPy9b8Zb9VjzYyX0EtCEA-wxGvJjglgGGxhAJh_Bbxc2Pm7JSAc-JcpzsT4EBEBd1ydxNU9gRAbcIURYFRejJDpNYI7KzyFblaH7ShEzJLOnjMDH5wQYqieRshKrM1cPF5ZeNHMm3lZwUN9H"/>
+<span class="font-semibold text-on-surface">Jordan S.</span>
+</div>
+<span>wants to merge 12 commits into <code class="bg-surface-container-highest px-1.5 py-0.5 rounded text-xs">main</code> from <code class="bg-surface-container-highest px-1.5 py-0.5 rounded text-xs">feature/mesh-optimization</code></span>
+</div>
+</div>
+<!-- Two-Column Editorial Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+<!-- Main Content Column -->
+<div class="lg:col-span-8 flex flex-col gap-6">
+<!-- PR Description Card -->
+<section class="bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+<div class="flex items-center justify-between mb-6">
+<h2 class="title-sm font-bold tracking-tight text-on-surface uppercase">Description</h2>
+<button class="text-primary text-sm font-semibold hover:underline">Edit</button>
+</div>
+<div class="prose prose-slate max-w-none text-on-surface-variant body-md leading-relaxed space-y-4">
+<p>This PR introduces a more resilient service mesh pattern to handle intermittent network partitions in the European cluster. We are moving away from the monolithic sidecar configuration towards a distributed topology.</p>
+<ul class="list-disc pl-5 space-y-2">
+<li>Updated mTLS certificates rotation logic.</li>
+<li>Optimized resource allocation for Envoy proxies (approx. 15% reduction in CPU).</li>
+<li>Fixed a race condition in the discovery service during warm-up.</li>
+</ul>
+</div>
+</section>
+<!-- Timeline / Activity -->
+<section class="space-y-4">
+<h2 class="title-sm font-bold tracking-tight text-on-surface uppercase px-2">Activity Timeline</h2>
+<div class="relative pl-8 space-y-8 before:content-[''] before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-surface-container-highest">
+<!-- Activity Item 1: Comment -->
+<div class="relative">
+<span class="absolute -left-8 top-1 w-6 h-6 rounded-full bg-surface-container-highest flex items-center justify-center ring-4 ring-surface-container-low">
+<span class="material-symbols-outlined text-xs text-outline" style="font-variation-settings: 'FILL' 1;">mode_comment</span>
+</span>
+<div class="bg-surface-container-lowest rounded-lg p-5 shadow-sm">
+<div class="flex items-center justify-between mb-3">
+<div class="flex items-center gap-2">
+<span class="text-sm font-bold">Sarah Miller</span>
+<span class="text-xs text-outline">2 hours ago</span>
+</div>
+<span class="material-symbols-outlined text-outline text-sm">more_horiz</span>
+</div>
+<p class="text-sm text-on-surface-variant leading-snug">The retry logic on line 142 seems a bit aggressive for the database shard. Should we consider an exponential backoff instead?</p>
+<div class="mt-4 flex items-center gap-3">
+<button class="text-xs font-bold text-primary hover:bg-primary-fixed px-3 py-1 rounded transition-colors">Reply</button>
+<button class="text-xs font-bold text-outline hover:text-on-surface px-3 py-1 rounded transition-colors">Resolve</button>
+</div>
+</div>
+</div>
+<!-- Activity Item 2: Vote -->
+<div class="relative">
+<span class="absolute -left-8 top-1 w-6 h-6 rounded-full bg-primary-fixed flex items-center justify-center ring-4 ring-surface-container-low">
+<span class="material-symbols-outlined text-xs text-primary" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</span>
+<div class="flex items-center gap-2 py-1">
+<span class="text-sm font-bold">Alex Chen</span>
+<span class="text-sm text-on-surface-variant">approved these changes</span>
+<span class="text-xs text-outline">1 hour ago</span>
+</div>
+</div>
+<!-- Activity Item 3: Commit -->
+<div class="relative">
+<span class="absolute -left-8 top-1 w-6 h-6 rounded-full bg-surface-container-highest flex items-center justify-center ring-4 ring-surface-container-low">
+<span class="material-symbols-outlined text-xs text-outline">commit</span>
+</span>
+<div class="flex items-center justify-between py-1 bg-surface-container/50 rounded-lg px-4 border border-outline-variant/10">
+<div class="flex items-center gap-3">
+<code class="text-xs font-mono text-primary font-bold">8f2a10c</code>
+<span class="text-sm text-on-surface font-medium truncate max-w-xs">chore: update Envoy proxy configuration schema</span>
+</div>
+<span class="text-xs text-outline">45 mins ago</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Sidebar Column -->
+<div class="lg:col-span-4 flex flex-col gap-6">
+<!-- Reviewers Panel -->
+<section class="bg-surface-container-lowest rounded-xl p-6 shadow-sm">
+<h2 class="title-sm font-bold tracking-tight text-on-surface uppercase mb-4">Reviewers</h2>
+<div class="space-y-4">
+<!-- Approved Reviewer -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<img class="w-8 h-8 rounded-full" data-alt="Senior male engineer portrait, focused and professional" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5Tv2rfiWG6ARrtnwo7Mce-IhZrb0xq3svp7vhJOVwZn_VX0Bognumtnv3i8nQb6Vn_mYruPhGrIxWlDr-YuZgmH1ENRm1572Z2u5Lup4yjZrxB6SxaVEibjSjgJHVLhOx8BGBlEH_xgXsN_b_LubbCseLIpINXMQUsN0IbKTp3UnTgI8bFPel7nIzOt3oGvmzs8jZZy87bjkXpmyCr0LxDQ9YMperCMFABEaEQ2N1w97YygOUFxfJZNmZFG27mo0o4WKZtCCQ9QFe"/>
+<div>
+<p class="text-sm font-bold text-on-surface">Alex Chen</p>
+<p class="text-[10px] text-outline uppercase font-bold tracking-tighter">Infrastructure Team</p>
+</div>
+</div>
+<div class="flex items-center gap-1 text-primary">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-xs font-bold">Approved</span>
+</div>
+</div>
+<!-- Waiting Reviewer -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<img class="w-8 h-8 rounded-full opacity-60" data-alt="Female tech lead portrait, neutral background, sharp lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDGdd5ydUA15KjfWCVG0paN94ju3PW4uN9-89Dy980cX28dBk7rqviTCgwGoml7NnGEyQoXiKPVGWZAkE2I9IQHE0kvNu7a-ggbOGND05w32hFx1HjV6u6vzRd5cY2KfdsMsEQ8rUTuJPtKNlB-MV-k_fjQjztQ1s8lISWKxDoSDV20t9Msi9bRtzdEuGrnvMt6TQeX4cJ2TlLgVt7vCafCDeF7LhqhRO_nKQn0mlzxAf0LsVNMUEmKwHG4LJXh-PFXFmJBjcNmcz9C"/>
+<div>
+<p class="text-sm font-bold text-on-surface opacity-60">Sarah Miller</p>
+<p class="text-[10px] text-outline uppercase font-bold tracking-tighter">Backend Core</p>
+</div>
+</div>
+<div class="flex items-center gap-1 text-outline">
+<span class="material-symbols-outlined text-lg">schedule</span>
+<span class="text-xs font-bold">Waiting</span>
+</div>
+</div>
+<button class="w-full mt-4 py-2 border-2 border-dashed border-outline-variant rounded-lg text-xs font-bold text-outline hover:text-primary hover:border-primary transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">add</span> Add Reviewer
+                            </button>
+</div>
+</section>
+<!-- Work Items & Metadata -->
+<section class="bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm">
+<div class="p-6">
+<h2 class="title-sm font-bold tracking-tight text-on-surface uppercase mb-4">Linked Items</h2>
+<div class="space-y-3">
+<div class="flex items-center gap-3 p-2 hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-tertiary" style="font-variation-settings: 'FILL' 1;">task</span>
+<div>
+<p class="text-xs font-bold text-on-surface group-hover:text-primary transition-colors">#2045: Service Mesh Latency</p>
+<p class="text-[10px] text-outline">User Story • In Progress</p>
+</div>
+</div>
+<div class="flex items-center gap-3 p-2 hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-error" style="font-variation-settings: 'FILL' 1;">bug_report</span>
+<div>
+<p class="text-xs font-bold text-on-surface group-hover:text-primary transition-colors">#1982: Cluster Discovery Race</p>
+<p class="text-[10px] text-outline">Bug • Fixed</p>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-highest/50 p-6 border-t border-outline-variant/10">
+<h3 class="text-[10px] font-bold text-outline uppercase tracking-widest mb-3">Checks</h3>
+<div class="space-y-2">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-sm">check_circle</span>
+<span class="text-xs font-medium text-on-surface">Unit Tests</span>
+</div>
+<span class="text-[10px] font-mono text-outline">PASSING</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-sm">check_circle</span>
+<span class="text-xs font-medium text-on-surface">Static Analysis</span>
+</div>
+<span class="text-[10px] font-mono text-outline">PASSING</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-sm">pending</span>
+<span class="text-xs font-medium text-on-surface">Security Scan</span>
+</div>
+<span class="text-[10px] font-mono text-outline">RUNNING</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Stats / Mini Data Viz -->
+<section class="bg-surface-container-lowest rounded-xl p-6 shadow-sm">
+<div class="grid grid-cols-2 gap-4 text-center">
+<div class="p-4 bg-surface-container-low rounded-lg">
+<p class="text-2xl font-black text-on-surface">742</p>
+<p class="text-[10px] font-bold text-outline uppercase">Added</p>
+</div>
+<div class="p-4 bg-surface-container-low rounded-lg">
+<p class="text-2xl font-black text-on-surface">128</p>
+<p class="text-[10px] font-bold text-outline uppercase">Removed</p>
+</div>
+</div>
+</section>
+</div>
+</div>
+</div>
+</main>
+<!-- FAB Action (Contextual) -->
+<button class="fixed bottom-8 right-8 w-14 h-14 cta-gradient text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all z-50">
+<span class="material-symbols-outlined text-2xl">check</span>
+</button>
+</body></html>

@@ -1,0 +1,48 @@
+# Gradle
+.gradle/
+build/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE — JetBrains
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# IDE — VS Code / Cursor (local only; remove if you commit workspace settings)
+.vscode/*
+!.vscode/extensions.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local machine / Android legacy
+local.properties
+
+# Kotlin
+.kotlin/
+
+# JVM / diagnostics
+*.hprof
+hs_err_pid*
+replay_pid*
+
+# Logs & temp
+*.log
+*.tmp
+*.swp
+*~
+
+# Env and secrets (never commit PATs or tokens)
+.env
+.env.*
+*.pat
+secrets/
+
+# Compose Desktop / packaging scratch
+*.dmg
+*.msi
+*.deb
