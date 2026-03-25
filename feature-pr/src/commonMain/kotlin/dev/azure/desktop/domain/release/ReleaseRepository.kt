@@ -18,4 +18,22 @@ interface ReleaseRepository {
         projectName: String,
         releaseId: Int,
     ): Result<ReleaseDetail>
+
+    suspend fun getReleaseDefinition(
+        organization: String,
+        projectName: String,
+        definitionId: Int,
+    ): Result<ReleaseDefinitionDetail>
+
+    suspend fun createRelease(
+        params: CreateReleaseParams,
+    ): Result<CreatedRelease>
+
+    /** Triggers deployment for a release environment (PATCH status to `inProgress`). */
+    suspend fun deployReleaseEnvironment(
+        organization: String,
+        projectName: String,
+        releaseId: Int,
+        environmentId: Int,
+    ): Result<Unit>
 }

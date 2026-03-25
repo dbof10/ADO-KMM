@@ -116,6 +116,7 @@ fun App() {
                     projectName = rel.projectName,
                     releaseId = rel.id,
                     getReleaseDetailUseCase = JvmReleaseServices.getReleaseDetailUseCase,
+                    deployReleaseEnvironmentUseCase = JvmReleaseServices.deployReleaseEnvironmentUseCase,
                 )
             }
         }
@@ -250,10 +251,17 @@ fun App() {
                             Text("Sign in to view releases.")
                         } else {
                             ReleaseListScreen(
+                                organization = organization,
                                 stateMachine = machine,
                                 onOpenRelease = {
                                     selectedRelease = it
                                     screen.value = AppScreen.ReleaseDetail
+                                },
+                                getReleaseDefinition = { projectName, definitionId ->
+                                    JvmReleaseServices.getReleaseDefinitionUseCase(organization, projectName, definitionId)
+                                },
+                                createRelease = { params ->
+                                    JvmReleaseServices.createReleaseUseCase(params)
                                 },
                                 modifier = Modifier.fillMaxSize(),
                             )

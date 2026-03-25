@@ -2,6 +2,7 @@ package dev.azure.desktop.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,13 +12,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.Button
@@ -89,16 +93,26 @@ fun ReleaseDetailScreen(
                 }
 
             is ReleaseDetailState.Content ->
-                ReleaseDetailBody(detail = current.detail, onBack = onBack)
+                ReleaseDetailBody(
+                    content = current,
+                    onBack = onBack,
+                    onReload = { scope.launch { stateMachine.dispatch(ReleaseDetailAction.Reload) } },
+                    onDeploy = { envId ->
+                        scope.launch { stateMachine.dispatch(ReleaseDetailAction.DeployEnvironment(envId)) }
+                    },
+                )
         }
     }
 }
 
 @Composable
 private fun ReleaseDetailBody(
-    detail: ReleaseDetail,
+    content: ReleaseDetailState.Content,
     onBack: () -> Unit,
+    onReload: () -> Unit,
+    onDeploy: (environmentId: Int) -> Unit,
 ) {
+    val detail = content.detail
     var tab by remember { mutableIntStateOf(0) }
     Column(Modifier.fillMaxSize().padding(20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -156,7 +170,13 @@ private fun ReleaseDetailBody(
                         shape = RoundedCornerShape(12.dp),
                         color = EditorialColors.surfaceContainerLowest,
                     ) {
-                        StagesFlowColumn(environments = detail.environments)
+                        StagesFlowColumn(
+                            environments = detail.environments,
+                            isDeploying = content.isDeploying,
+                            deployError = content.deployError,
+                            onReload = onReload,
+                            onDeploy = onDeploy,
+                        )
                     }
                 }
             1 ->
@@ -217,18 +237,52 @@ private fun ReleaseMetaColumn(detail: ReleaseDetail) {
 }
 
 @Composable
-private fun StagesFlowColumn(environments: List<ReleaseEnvironmentInfo>) {
+private fun StagesFlowColumn(
+    environments: List<ReleaseEnvironmentInfo>,
+    isDeploying: Boolean,
+    deployError: String?,
+    onReload: () -> Unit,
+    onDeploy: (environmentId: Int) -> Unit,
+) {
+    var selectedStageIndex by remember { mutableIntStateOf(0) }
+    LaunchedEffect(environments.size) {
+        if (environments.isEmpty()) return@LaunchedEffect
+        if (selectedStageIndex >= environments.size) {
+            selectedStageIndex = environments.lastIndex
+        }
+    }
+
     Column(
         Modifier
             .fillMaxSize()
             .padding(16.dp)
             .verticalScroll(rememberScrollState()),
     ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("Stages", fontWeight = FontWeight.SemiBold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { }, enabled = false) { Text("Refresh") }
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text("Stages", fontWeight = FontWeight.SemiBold)
+                if (isDeploying) {
+                    CircularProgressIndicator(
+                        Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = EditorialColors.primary,
+                    )
+                }
             }
+            OutlinedButton(onClick = onReload, enabled = !isDeploying) {
+                Text("Refresh")
+            }
+        }
+        deployError?.takeIf { it.isNotBlank() }?.let { msg ->
+            Spacer(Modifier.height(10.dp))
+            Text(msg, color = EditorialColors.error, style = MaterialTheme.typography.bodySmall)
         }
         Spacer(Modifier.height(16.dp))
         environments.forEachIndexed { index, env ->
@@ -243,7 +297,10 @@ private fun StagesFlowColumn(environments: List<ReleaseEnvironmentInfo>) {
             }
             EnvironmentStageCard(
                 env = env,
-                selected = env.status == ReleaseDeploymentStatus.InProgress,
+                selected = index == selectedStageIndex,
+                onSelect = { selectedStageIndex = index },
+                isDeploying = isDeploying,
+                onDeploy = { onDeploy(env.id) },
             )
         }
     }
@@ -253,38 +310,78 @@ private fun StagesFlowColumn(environments: List<ReleaseEnvironmentInfo>) {
 private fun EnvironmentStageCard(
     env: ReleaseEnvironmentInfo,
     selected: Boolean,
+    onSelect: () -> Unit,
+    isDeploying: Boolean,
+    onDeploy: () -> Unit,
 ) {
     val borderColor =
         if (selected) EditorialColors.primary.copy(alpha = 0.5f)
         else EditorialColors.outlineVariant.copy(alpha = 0.4f)
+    val statusLine = environmentStatusDisplayText(env)
     Surface(
         shape = RoundedCornerShape(12.dp),
         color =
             if (selected) EditorialColors.primary.copy(alpha = 0.06f)
             else EditorialColors.surface,
         border = BorderStroke(1.dp, borderColor),
+        modifier = Modifier.clickable(onClick = onSelect),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StageStatusGlyph(env.status)
                 Column {
                     Text(env.name, fontWeight = FontWeight.SemiBold)
-                    Text(env.statusLabel, style = MaterialTheme.typography.bodySmall, color = EditorialColors.onSurfaceVariant)
+                    Text(statusLine, style = MaterialTheme.typography.bodySmall, color = EditorialColors.onSurfaceVariant)
                 }
             }
             env.detailLine?.let { line ->
                 Text(line, style = MaterialTheme.typography.bodySmall, color = EditorialColors.onSurfaceVariant)
             }
             if (selected) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { }, enabled = false) { Text("Cancel") }
-                    OutlinedButton(onClick = { }, enabled = false) { Text("Logs") }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (env.status == ReleaseDeploymentStatus.NotStarted) {
+                        OutlinedButton(
+                            onClick = onDeploy,
+                            enabled = !isDeploying && env.id > 0,
+                        ) {
+                            Icon(
+                                Icons.Outlined.CloudUpload,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text("Deploy")
+                        }
+                    }
+                    if (env.status == ReleaseDeploymentStatus.InProgress) {
+                        OutlinedButton(onClick = { }, enabled = false) {
+                            Text("Cancel")
+                        }
+                    }
+                    OutlinedButton(onClick = { }, enabled = false) {
+                        Icon(
+                            Icons.AutoMirrored.Outlined.List,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Logs")
+                    }
                 }
             }
         }
     }
     Spacer(Modifier.height(12.dp))
 }
+
+private fun environmentStatusDisplayText(env: ReleaseEnvironmentInfo): String =
+    when (env.status) {
+        ReleaseDeploymentStatus.NotStarted -> "Not deployed"
+        else -> env.statusLabel
+    }
 
 @Composable
 private fun StageStatusGlyph(status: ReleaseDeploymentStatus) {

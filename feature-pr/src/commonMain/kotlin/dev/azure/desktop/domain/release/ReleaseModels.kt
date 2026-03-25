@@ -17,6 +17,33 @@ data class ReleaseDefinitionSummary(
     val subtitle: String?,
 )
 
+/** One environment stage on a release definition (from GET definition API). */
+data class ReleaseDefinitionEnvironmentStage(
+    val id: Int,
+    val name: String,
+    val rank: Int,
+)
+
+data class ReleaseDefinitionDetail(
+    val id: Int,
+    val name: String,
+    val stages: List<ReleaseDefinitionEnvironmentStage>,
+)
+
+data class CreatedRelease(
+    val id: Int,
+    val name: String?,
+)
+
+data class CreateReleaseParams(
+    val organization: String,
+    val projectName: String,
+    val definitionId: Int,
+    val description: String,
+    /** Environment display names to start as manual (`manualEnvironments` in create API). */
+    val manualEnvironmentNames: List<String>,
+)
+
 data class ReleaseStagePill(
     val name: String,
     val status: ReleaseDeploymentStatus,
@@ -43,6 +70,8 @@ data class ReleaseArtifactInfo(
 )
 
 data class ReleaseEnvironmentInfo(
+    /** Release environment resource id (for deploy/update environment REST calls). */
+    val id: Int,
     val name: String,
     val rank: Int,
     val status: ReleaseDeploymentStatus,

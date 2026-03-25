@@ -28,6 +28,7 @@ import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.RocketLaunch
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -56,6 +57,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.azure.desktop.domain.pr.DevOpsProject
+import dev.azure.desktop.domain.release.CreateReleaseParams
+import dev.azure.desktop.domain.release.CreatedRelease
+import dev.azure.desktop.domain.release.ReleaseDefinitionDetail
 import dev.azure.desktop.domain.release.ReleaseDefinitionSummary
 import dev.azure.desktop.domain.release.ReleaseDeploymentStatus
 import dev.azure.desktop.domain.release.ReleaseStagePill
@@ -68,8 +72,11 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun ReleaseListScreen(
+    organization: String,
     stateMachine: ReleaseListStateMachine,
     onOpenRelease: (ReleaseSummary) -> Unit,
+    getReleaseDefinition: suspend (String, Int) -> Result<ReleaseDefinitionDetail>,
+    createRelease: suspend (CreateReleaseParams) -> Result<CreatedRelease>,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -101,6 +108,7 @@ fun ReleaseListScreen(
 
             is ReleaseListState.LoadingDefinitions ->
                 ReleaseListLayout(
+                    organization = organization,
                     projects = current.projects,
                     selectedProjectName = current.selectedProjectName,
                     onSelectProject = { scope.launch { stateMachine.dispatch(ReleaseListAction.SelectProject(it)) } },
@@ -111,6 +119,8 @@ fun ReleaseListScreen(
                     listBusy = true,
                     onRefresh = { scope.launch { stateMachine.dispatch(ReleaseListAction.Refresh) } },
                     onOpenRelease = onOpenRelease,
+                    getReleaseDefinition = getReleaseDefinition,
+                    createRelease = createRelease,
                 )
 
             is ReleaseListState.DefinitionsError ->
@@ -131,6 +141,7 @@ fun ReleaseListScreen(
 
             is ReleaseListState.LoadingReleases ->
                 ReleaseListLayout(
+                    organization = organization,
                     projects = current.projects,
                     selectedProjectName = current.selectedProjectName,
                     onSelectProject = { scope.launch { stateMachine.dispatch(ReleaseListAction.SelectProject(it)) } },
@@ -143,6 +154,8 @@ fun ReleaseListScreen(
                     listBusy = true,
                     onRefresh = { scope.launch { stateMachine.dispatch(ReleaseListAction.Refresh) } },
                     onOpenRelease = onOpenRelease,
+                    getReleaseDefinition = getReleaseDefinition,
+                    createRelease = createRelease,
                 )
 
             is ReleaseListState.ReleasesError ->
@@ -171,6 +184,7 @@ fun ReleaseListScreen(
 
             is ReleaseListState.Ready ->
                 ReleaseListLayout(
+                    organization = organization,
                     projects = current.projects,
                     selectedProjectName = current.selectedProjectName,
                     onSelectProject = { scope.launch { stateMachine.dispatch(ReleaseListAction.SelectProject(it)) } },
@@ -183,6 +197,8 @@ fun ReleaseListScreen(
                     listBusy = false,
                     onRefresh = { scope.launch { stateMachine.dispatch(ReleaseListAction.Refresh) } },
                     onOpenRelease = onOpenRelease,
+                    getReleaseDefinition = getReleaseDefinition,
+                    createRelease = createRelease,
                 )
         }
     }
@@ -190,6 +206,7 @@ fun ReleaseListScreen(
 
 @Composable
 private fun ReleaseListLayout(
+    organization: String,
     projects: List<DevOpsProject>,
     selectedProjectName: String,
     onSelectProject: (String) -> Unit,
@@ -200,7 +217,11 @@ private fun ReleaseListLayout(
     listBusy: Boolean,
     onRefresh: () -> Unit,
     onOpenRelease: (ReleaseSummary) -> Unit,
+    getReleaseDefinition: suspend (String, Int) -> Result<ReleaseDefinitionDetail>,
+    createRelease: suspend (CreateReleaseParams) -> Result<CreatedRelease>,
 ) {
+    var showCreateDialog by remember { mutableStateOf(false) }
+
     Column(Modifier.fillMaxSize().padding(24.dp)) {
         ProjectStrip(
             projects = projects,
@@ -219,6 +240,9 @@ private fun ReleaseListLayout(
                     definitions = definitions,
                     selectedDefinitionId = selectedDefinitionId,
                     onSelectDefinition = onSelectDefinition,
+                    onNewRelease = {
+                        if (selectedDefinitionId != null) showCreateDialog = true
+                    },
                 )
             }
             Spacer(Modifier.width(16.dp))
@@ -233,8 +257,26 @@ private fun ReleaseListLayout(
                     releases = releases,
                     busy = listBusy,
                     onOpenRelease = onOpenRelease,
+                    canCreateRelease = selectedDefinitionId != null && !listBusy,
+                    onCreateReleaseClick = {
+                        if (selectedDefinitionId != null) showCreateDialog = true
+                    },
                 )
             }
+        }
+
+        val defId = selectedDefinitionId
+        if (defId != null) {
+            CreateReleaseDialog(
+                visible = showCreateDialog,
+                organization = organization,
+                projectName = selectedProjectName,
+                definitionId = defId,
+                getReleaseDefinition = getReleaseDefinition,
+                createRelease = createRelease,
+                onDismiss = { showCreateDialog = false },
+                onCreated = onRefresh,
+            )
         }
     }
 }
@@ -280,6 +322,7 @@ private fun DefinitionSidebarOnly(
                 definitions = definitions,
                 selectedDefinitionId = selectedDefinitionId,
                 onSelectDefinition = onSelectDefinition,
+                onNewRelease = { },
             )
         }
     }
@@ -323,6 +366,7 @@ private fun ReleaseLeftRail(
     definitions: List<ReleaseDefinitionSummary>,
     selectedDefinitionId: Int?,
     onSelectDefinition: (Int) -> Unit,
+    onNewRelease: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
     val filtered =
@@ -337,7 +381,11 @@ private fun ReleaseLeftRail(
             Icon(Icons.Outlined.FolderOpen, null, tint = EditorialColors.outline, modifier = Modifier.padding(4.dp))
             Icon(Icons.Outlined.RocketLaunch, null, tint = EditorialColors.primary, modifier = Modifier.padding(4.dp))
             Spacer(Modifier.weight(1f))
-            OutlinedButton(onClick = { }, enabled = false, modifier = Modifier.height(32.dp)) {
+            OutlinedButton(
+                onClick = onNewRelease,
+                enabled = selectedDefinitionId != null,
+                modifier = Modifier.height(32.dp),
+            ) {
                 Text("+ New", style = MaterialTheme.typography.labelSmall)
             }
         }
@@ -393,12 +441,28 @@ private fun ReleaseMainPanel(
     releases: List<ReleaseSummary>,
     busy: Boolean,
     onOpenRelease: (ReleaseSummary) -> Unit,
+    canCreateRelease: Boolean,
+    onCreateReleaseClick: () -> Unit,
 ) {
     var mainTab by remember { mutableIntStateOf(0) }
     val defName = definitions.firstOrNull { it.id == selectedDefinitionId }?.name.orEmpty()
 
     Column(Modifier.fillMaxSize().padding(20.dp)) {
-        Text(defName.ifBlank { "Pipelines" }, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(defName.ifBlank { "Pipelines" }, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Button(
+                onClick = onCreateReleaseClick,
+                enabled = canCreateRelease,
+                colors = ButtonDefaults.buttonColors(containerColor = EditorialColors.primaryContainer),
+                shape = RoundedCornerShape(10.dp),
+            ) {
+                Text("Create release")
+            }
+        }
         Spacer(Modifier.height(8.dp))
         TabRow(
             selectedTabIndex = mainTab,

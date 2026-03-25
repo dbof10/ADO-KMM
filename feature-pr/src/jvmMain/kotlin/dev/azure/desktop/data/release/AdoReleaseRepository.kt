@@ -1,6 +1,10 @@
 package dev.azure.desktop.data.release
 
+import dev.azure.desktop.domain.release.CreateReleaseParams
+import dev.azure.desktop.domain.release.CreatedRelease
 import dev.azure.desktop.domain.release.ReleaseArtifactInfo
+import dev.azure.desktop.domain.release.ReleaseDefinitionDetail
+import dev.azure.desktop.domain.release.ReleaseDefinitionEnvironmentStage
 import dev.azure.desktop.domain.release.ReleaseDefinitionSummary
 import dev.azure.desktop.domain.release.ReleaseDeploymentStatus
 import dev.azure.desktop.domain.release.ReleaseDetail
@@ -12,8 +16,13 @@ import dev.azure.desktop.domain.release.ReleaseTimelineEntry
 import dev.azure.desktop.domain.release.ReleaseVariableRow
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
+import io.ktor.client.request.patch
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.contentType
 import io.ktor.http.encodeURLParameter
 import io.ktor.http.encodeURLPathPart
 import io.ktor.http.isSuccess
@@ -21,12 +30,18 @@ import java.util.Base64
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 
 /**
  * Fetches release definitions and releases from Azure DevOps **Release** REST APIs on
@@ -177,6 +192,120 @@ class AdoReleaseRepository(
             parseReleaseDetail(response.bodyAsText(), projectName.trim())
         }
 
+    override suspend fun getReleaseDefinition(
+        organization: String,
+        projectName: String,
+        definitionId: Int,
+    ): Result<ReleaseDefinitionDetail> =
+        runCatching {
+            require(organization.isNotBlank()) { "Missing organization." }
+            require(projectName.isNotBlank()) { "Missing project." }
+            val url =
+                buildString {
+                    append("https://")
+                    append(VsrmHost)
+                    append("/")
+                    append(organization.trim().encodeURLPathPart())
+                    append("/")
+                    append(projectName.trim().encodeURLPathPart())
+                    append("/_apis/release/definitions/")
+                    append(definitionId)
+                    append("?api-version=")
+                    append(ApiVersion)
+                }
+            val response = httpClient.get(url) {
+                headers.append(HttpHeaders.Authorization, basicAuth())
+            }
+            require(response.status.isSuccess()) {
+                "Unable to load release definition (${response.status.value})."
+            }
+            parseReleaseDefinitionDetail(response.bodyAsText())
+        }
+
+    override suspend fun createRelease(params: CreateReleaseParams): Result<CreatedRelease> =
+        runCatching {
+            require(params.organization.isNotBlank()) { "Missing organization." }
+            require(params.projectName.isNotBlank()) { "Missing project." }
+            val url =
+                buildString {
+                    append("https://")
+                    append(VsrmHost)
+                    append("/")
+                    append(params.organization.trim().encodeURLPathPart())
+                    append("/")
+                    append(params.projectName.trim().encodeURLPathPart())
+                    append("/_apis/release/releases?api-version=")
+                    append(ApiVersion)
+                }
+            val body =
+                buildJsonObject {
+                    put("definitionId", params.definitionId)
+                    put("description", params.description)
+                    put("isDraft", false)
+                    put("reason", "manual")
+                    if (params.manualEnvironmentNames.isNotEmpty()) {
+                        putJsonArray("manualEnvironments") {
+                            params.manualEnvironmentNames.forEach { add(JsonPrimitive(it)) }
+                        }
+                    }
+                }
+            val response =
+                httpClient.post(url) {
+                    headers.append(HttpHeaders.Authorization, basicAuth())
+                    headers.append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    setBody(json.encodeToString(body))
+                }
+            val raw = response.bodyAsText()
+            require(response.status.isSuccess()) {
+                "Create release failed (${response.status.value}): ${raw.take(400)}"
+            }
+            parseCreatedRelease(raw)
+        }
+
+    override suspend fun deployReleaseEnvironment(
+        organization: String,
+        projectName: String,
+        releaseId: Int,
+        environmentId: Int,
+    ): Result<Unit> =
+        runCatching {
+            require(organization.isNotBlank()) { "Missing organization." }
+            require(projectName.isNotBlank()) { "Missing project." }
+            require(environmentId > 0) { "Missing release environment id." }
+            val url =
+                buildString {
+                    append("https://")
+                    append(VsrmHost)
+                    append("/")
+                    append(organization.trim().encodeURLPathPart())
+                    append("/")
+                    append(projectName.trim().encodeURLPathPart())
+                    append("/_apis/release/releases/")
+                    append(releaseId)
+                    append("/environments/")
+                    append(environmentId)
+                    append("?api-version=")
+                    append(ApiVersion)
+                }
+            val body =
+                buildJsonObject {
+                    put("status", "inProgress")
+                    put("scheduledDeploymentTime", JsonNull)
+                    put("comment", JsonNull)
+                    putJsonObject("variables") { }
+                }
+            val response =
+                httpClient.patch(url) {
+                    headers.append(HttpHeaders.Authorization, basicAuth())
+                    headers.append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    setBody(json.encodeToString(body))
+                }
+            val raw = response.bodyAsText()
+            require(response.status.isSuccess()) {
+                "Deploy failed (${response.status.value}): ${raw.take(400)}"
+            }
+        }
+
     private fun basicAuth(): String {
         val pat = patProvider()?.trim().orEmpty()
         require(pat.isNotBlank()) { "Session token is missing. Please sign in again." }
@@ -223,6 +352,31 @@ class AdoReleaseRepository(
             variables = variables,
             timeline = timeline,
         )
+    }
+
+    private fun parseReleaseDefinitionDetail(raw: String): ReleaseDefinitionDetail {
+        val root = json.parseToJsonElement(raw).jsonObject
+        val id = root["id"].intOrNull() ?: error("Invalid release definition.")
+        val name = root["name"].stringOrNull().orEmpty()
+        val stages =
+            root["environments"].asArray()
+                .mapNotNull { it.asObjectOrNull()?.toDefinitionEnvironmentStage() }
+                .sortedWith(compareBy({ it.rank }, { it.name.lowercase() }))
+        return ReleaseDefinitionDetail(id = id, name = name, stages = stages)
+    }
+
+    private fun JsonObject.toDefinitionEnvironmentStage(): ReleaseDefinitionEnvironmentStage? {
+        val id = this["id"].intOrNull() ?: return null
+        val name = this["name"].stringOrNull()?.trim().orEmpty().ifBlank { return null }
+        val rank = this["rank"].intOrNull() ?: 0
+        return ReleaseDefinitionEnvironmentStage(id = id, name = name, rank = rank)
+    }
+
+    private fun parseCreatedRelease(raw: String): CreatedRelease {
+        val root = json.parseToJsonElement(raw).jsonObject
+        val id = root["id"].intOrNull() ?: error("Create release response missing id.")
+        val name = root["name"].stringOrNull()
+        return CreatedRelease(id = id, name = name)
     }
 
     private fun JsonObject.toDefinitionSummary(): ReleaseDefinitionSummary? {
@@ -286,12 +440,14 @@ class AdoReleaseRepository(
     }
 
     private fun JsonObject.toEnvironmentDetail(): ReleaseEnvironmentInfo {
+        val id = this["id"].intOrNull() ?: 0
         val name = this["name"].stringOrNull().orEmpty()
         val rank = this["rank"].intOrNull() ?: 0
         val status = mapEnvStatus(this["status"].stringOrNull())
         val rawStatus = this["status"].stringOrNull().orEmpty()
         val detail = firstDeployStepName(this)
         return ReleaseEnvironmentInfo(
+            id = id,
             name = name,
             rank = rank,
             status = status,
