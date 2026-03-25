@@ -29,11 +29,12 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.Button
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -56,6 +57,10 @@ import java.time.Instant
 @Composable
 fun PrOverviewScreen(
     detail: PullRequestDetail,
+    isVoting: Boolean,
+    voteErrorMessage: String?,
+    onApprove: () -> Unit,
+    onReject: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val summary = detail.summary
@@ -104,6 +109,34 @@ fun PrOverviewScreen(
                     color = EditorialColors.onSurfaceVariant,
                 )
             }
+            Spacer(Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(
+                        onClick = onReject,
+                        enabled = !isVoting,
+                    ) {
+                        Text("Reject")
+                    }
+                    Button(
+                        onClick = onApprove,
+                        enabled = !isVoting,
+                    ) {
+                        Text("Approve")
+                    }
+                }
+            }
+            if (!voteErrorMessage.isNullOrBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    voteErrorMessage,
+                    color = EditorialColors.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             Spacer(Modifier.height(28.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -140,16 +173,6 @@ fun PrOverviewScreen(
                 }
             }
             Spacer(Modifier.height(80.dp))
-        }
-        FloatingActionButton(
-            onClick = { },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(32.dp),
-            containerColor = EditorialColors.primaryContainer,
-            contentColor = EditorialColors.onPrimary,
-        ) {
-            Icon(Icons.Outlined.Check, contentDescription = null)
         }
     }
 }

@@ -5,6 +5,8 @@ import dev.azure.desktop.domain.pr.DevOpsProject
 import dev.azure.desktop.domain.pr.GetDefaultProjectNameUseCase
 import dev.azure.desktop.domain.pr.GetActivePullRequestsUseCase
 import dev.azure.desktop.domain.pr.GetMyPullRequestsUseCase
+import dev.azure.desktop.domain.pr.FindPullRequestSummaryByIdUseCase
+import dev.azure.desktop.domain.pr.GetPullRequestSummaryByIdUseCase
 import dev.azure.desktop.domain.pr.ListProjectsUseCase
 import dev.azure.desktop.domain.pr.PullRequestSummary
 import dev.azure.desktop.domain.pr.RecordProjectSelectedUseCase
@@ -31,6 +33,8 @@ sealed class PrListState {
         val selectedProjectName: String?,
         val tab: PrListTab,
         val items: List<PullRequestSummary>,
+        val pendingOpenPullRequest: PullRequestSummary? = null,
+        val openPullRequestError: String? = null,
     ) : PrListState()
 
     data class PullRequestsError(
@@ -46,6 +50,10 @@ sealed class PrListAction {
 
     data object RefreshPullRequests : PrListAction()
 
+    data class OpenPullRequestById(val pullRequestId: Int) : PrListAction()
+
+    data object ConsumePendingOpenPullRequest : PrListAction()
+
     data class SelectTab(val tab: PrListTab) : PrListAction()
 
     /** `null` = all projects in the organization. */
@@ -58,6 +66,8 @@ class PrListStateMachine(
     private val listProjectsUseCase: ListProjectsUseCase,
     private val getMyPullRequestsUseCase: GetMyPullRequestsUseCase,
     private val getActivePullRequestsUseCase: GetActivePullRequestsUseCase,
+    private val findPullRequestSummaryByIdUseCase: FindPullRequestSummaryByIdUseCase,
+    private val getPullRequestSummaryByIdUseCase: GetPullRequestSummaryByIdUseCase,
     private val getDefaultProjectNameUseCase: GetDefaultProjectNameUseCase,
     private val recordProjectSelectedUseCase: RecordProjectSelectedUseCase,
 ) : FlowReduxStateMachine<PrListState, PrListAction>(PrListState.LoadingProjects) {
@@ -68,10 +78,13 @@ class PrListStateMachine(
                     listProjectsUseCase(organization).fold(
                         onSuccess = { projects ->
                             val sorted = projects.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
-                            val defaultProject =
-                                getDefaultProjectNameUseCase(organization, sorted.map { it.name })
-                                    .getOrNull()
-                                    ?: sorted.firstOrNull()?.name
+                            val persistedDefault =
+                                getDefaultProjectNameUseCase(organization, sorted.map { it.name }).getOrNull()
+                            val fallbackDefault = sorted.firstOrNull()?.name
+                            val defaultProject = persistedDefault ?: fallbackDefault
+                            println(
+                                "[ProjectSelection] default org='${organization.trim()}' persisted='$persistedDefault' fallback='$fallbackDefault' chosen='$defaultProject' projects=${sorted.size}",
+                            )
                             state.override {
                                 PrListState.LoadingPullRequests(
                                     projects = sorted,
@@ -131,10 +144,15 @@ class PrListStateMachine(
                 }
                 on<PrListAction.SelectProject> { action, state ->
                     val snap = state.snapshot
+                    // Treat this action as a user-driven selection intent.
+                    // Even selecting the currently-selected project should increase its priority for future defaults.
+                    println(
+                        "[ProjectSelection] userSelect org='${organization.trim()}' from='${snap.selectedProjectName}' to='${action.projectName}' changed=${action.projectName != snap.selectedProjectName}",
+                    )
+                    action.projectName?.let { recordProjectSelectedUseCase(organization, it) }
                     if (action.projectName == snap.selectedProjectName) {
                         state.noChange()
                     } else {
-                        action.projectName?.let { recordProjectSelectedUseCase(organization, it) }
                         state.override {
                             PrListState.LoadingPullRequests(
                                 projects = snap.projects,
@@ -157,6 +175,60 @@ class PrListStateMachine(
             }
 
             inState<PrListState.Ready> {
+                on<PrListAction.OpenPullRequestById> { action, state ->
+                    val snap = state.snapshot
+                    val fromCurrentList = snap.items.firstOrNull { it.id == action.pullRequestId }
+                    val found =
+                        if (fromCurrentList != null) {
+                            Result.success(fromCurrentList)
+                        } else {
+                            val project = snap.selectedProjectName
+                            if (project.isNullOrBlank()) {
+                                findPullRequestSummaryByIdUseCase(
+                                    organization = organization,
+                                    projectName = null,
+                                    pullRequestId = action.pullRequestId,
+                                )
+                            } else {
+                                getPullRequestSummaryByIdUseCase(
+                                    organization = organization,
+                                    projectName = project,
+                                    pullRequestId = action.pullRequestId,
+                                )
+                            }
+                        }
+                    found.fold(
+                        onSuccess = { summary ->
+                            state.override {
+                                snap.copy(
+                                    pendingOpenPullRequest = summary,
+                                    openPullRequestError = null,
+                                )
+                            }
+                        },
+                        onFailure = {
+                            state.override {
+                                snap.copy(
+                                    pendingOpenPullRequest = null,
+                                    openPullRequestError = it.message ?: "Pull request not found.",
+                                )
+                            }
+                        },
+                    )
+                }
+                on<PrListAction.ConsumePendingOpenPullRequest> { _, state ->
+                    val snap = state.snapshot
+                    if (snap.pendingOpenPullRequest == null && snap.openPullRequestError == null) {
+                        state.noChange()
+                    } else {
+                        state.override {
+                            snap.copy(
+                                pendingOpenPullRequest = null,
+                                openPullRequestError = null,
+                            )
+                        }
+                    }
+                }
                 on<PrListAction.SelectTab> { action, state ->
                     val snap = state.snapshot
                     if (action.tab == snap.tab) {
@@ -173,10 +245,10 @@ class PrListStateMachine(
                 }
                 on<PrListAction.SelectProject> { action, state ->
                     val snap = state.snapshot
+                    action.projectName?.let { recordProjectSelectedUseCase(organization, it) }
                     if (action.projectName == snap.selectedProjectName) {
                         state.noChange()
                     } else {
-                        action.projectName?.let { recordProjectSelectedUseCase(organization, it) }
                         state.override {
                             PrListState.LoadingPullRequests(
                                 projects = snap.projects,
@@ -215,10 +287,10 @@ class PrListStateMachine(
                 }
                 on<PrListAction.SelectProject> { action, state ->
                     val snap = state.snapshot
+                    action.projectName?.let { recordProjectSelectedUseCase(organization, it) }
                     if (action.projectName == snap.selectedProjectName) {
                         state.noChange()
                     } else {
-                        action.projectName?.let { recordProjectSelectedUseCase(organization, it) }
                         state.override {
                             PrListState.LoadingPullRequests(
                                 projects = snap.projects,

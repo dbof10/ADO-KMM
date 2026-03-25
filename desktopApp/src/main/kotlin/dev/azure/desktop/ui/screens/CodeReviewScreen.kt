@@ -23,7 +23,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Sync
@@ -44,13 +46,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.azure.desktop.domain.pr.PullRequestChange
+import dev.azure.desktop.domain.pr.PullRequestCheckState
+import dev.azure.desktop.domain.pr.PullRequestCheckStatus
 import dev.azure.desktop.domain.pr.PullRequestDiffLine
 import dev.azure.desktop.pr.review.CodeReviewAction
 import dev.azure.desktop.pr.review.CodeReviewState
@@ -89,6 +95,8 @@ private fun FileExplorerPane(
     onSelectPath: (String) -> Unit,
     modifier: Modifier,
 ) {
+    var expandedFolders by remember { mutableStateOf(setOf<String>()) }
+
     Column(
         modifier
             .background(EditorialColors.surfaceContainerLow),
@@ -112,30 +120,100 @@ private fun FileExplorerPane(
         ) {
             when (state) {
                 CodeReviewState.Loading -> {
-                    FileRow(Icons.Outlined.FolderOpen, "Loading…", indent = 0, selected = false, dotColor = null, onClick = null)
+                    FileRow(
+                        disclosure = null,
+                        icon = Icons.Outlined.FolderOpen,
+                        label = "Loading…",
+                        indent = 0,
+                        selected = false,
+                        onClick = null,
+                    )
                 }
 
                 is CodeReviewState.Error -> {
-                    FileRow(Icons.Outlined.FolderOpen, "Failed to load", indent = 0, selected = false, dotColor = EditorialColors.error, onClick = null)
-                    FileRow(Icons.Outlined.Description, state.message, indent = 1, selected = false, dotColor = null, onClick = null)
+                    FileRow(
+                        disclosure = null,
+                        icon = Icons.Outlined.FolderOpen,
+                        label = "Failed to load",
+                        indent = 0,
+                        selected = false,
+                        onClick = null,
+                    )
+                    FileRow(
+                        disclosure = null,
+                        icon = Icons.Outlined.Description,
+                        label = state.message,
+                        indent = 1,
+                        selected = false,
+                        onClick = null,
+                    )
                 }
 
                 is CodeReviewState.Content -> {
                     if (state.changes.isEmpty()) {
-                        FileRow(Icons.Outlined.FolderOpen, "No changes", indent = 0, selected = false, dotColor = null, onClick = null)
+                        FileRow(
+                            disclosure = null,
+                            icon = Icons.Outlined.FolderOpen,
+                            label = "No changes",
+                            indent = 0,
+                            selected = false,
+                            onClick = null,
+                        )
                     } else {
-                        state.changes.forEach { change ->
-                            val selected = change.path == state.selectedPath
-                            val (dot, struck) = changeDotAndStrike(change)
-                            FileRow(
-                                icon = if (change.path.count { it == '/' } == 1) Icons.Outlined.Folder else Icons.Outlined.Description,
-                                label = change.path.trimStart('/'),
-                                indent = change.path.trimStart('/').count { it == '/' }.coerceAtMost(6),
-                                selected = selected,
-                                dotColor = dot,
-                                struck = struck,
-                                onClick = { onSelectPath(change.path) },
-                            )
+                        val paths = state.changes.map { it.path }
+                        val tree = buildPathTree(paths)
+                        val fileStrike = state.changes.associateBy({ it.path }, { changeDotAndStrike(it).second })
+
+                        // Auto-expand the first root folder for a nicer first view.
+                        LaunchedEffect(tree) {
+                            if (expandedFolders.isEmpty()) {
+                                val firstRootFolder = tree.filterIsInstance<PathNode.Folder>().firstOrNull()
+                                if (firstRootFolder != null) {
+                                    expandedFolders = expandedFolders + firstRootFolder.fullPath
+                                }
+                            }
+                        }
+
+                        val visible = flattenVisible(tree, expandedFolders)
+                        visible.forEach { item ->
+                            when (val node = item.node) {
+                                is PathNode.Folder -> {
+                                    val isExpanded = expandedFolders.contains(node.fullPath)
+                                    FileRow(
+                                        disclosure = {
+                                            Icon(
+                                                if (isExpanded) Icons.Outlined.ExpandMore else Icons.Outlined.ChevronRight,
+                                                null,
+                                                tint = EditorialColors.outline,
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                        },
+                                        icon = if (isExpanded) Icons.Outlined.FolderOpen else Icons.Outlined.Folder,
+                                        label = node.name,
+                                        indent = item.depth.coerceAtMost(8),
+                                        selected = false,
+                                        struck = false,
+                                        onClick = {
+                                            expandedFolders =
+                                                if (isExpanded) expandedFolders - node.fullPath else expandedFolders + node.fullPath
+                                        },
+                                    )
+                                }
+
+                                is PathNode.File -> {
+                                    val selected = node.fullPath == state.selectedPath
+                                    val struck = fileStrike[node.fullPath] ?: false
+                                    FileRow(
+                                        disclosure = null,
+                                        icon = Icons.Outlined.Description,
+                                        label = node.name,
+                                        indent = item.depth.coerceAtMost(8),
+                                        selected = selected,
+                                        struck = struck,
+                                        onClick = { onSelectPath(node.fullPath) },
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -169,11 +247,11 @@ private fun FileExplorerPane(
 
 @Composable
 private fun FileRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    disclosure: (@Composable () -> Unit)?,
+    icon: ImageVector,
     label: String,
     indent: Int,
     selected: Boolean,
-    dotColor: androidx.compose.ui.graphics.Color?,
     struck: Boolean = false,
     onClick: (() -> Unit)?,
 ) {
@@ -188,17 +266,17 @@ private fun FileRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Icon(icon, null, tint = if (selected) EditorialColors.primary else EditorialColors.outline, modifier = Modifier.size(20.dp))
-        Text(
-            label,
-            style = MaterialTheme.typography.bodySmall,
-            maxLines = 1,
-            modifier = Modifier.weight(1f),
-            textDecoration = if (struck) TextDecoration.LineThrough else TextDecoration.None,
-        )
-        if (dotColor != null) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(dotColor))
+        if (disclosure != null) {
+            disclosure()
+        } else {
+            Spacer(Modifier.width(18.dp))
         }
+        Icon(icon, null, tint = if (selected) EditorialColors.primary else EditorialColors.outline, modifier = Modifier.size(20.dp))
+        FileNameLabel(
+            label = label,
+            modifier = Modifier.weight(1f),
+            struck = struck,
+        )
     }
 }
 
@@ -430,6 +508,28 @@ private fun DiffFooter(state: CodeReviewState) {
                 a to r
             }
         }
+    val branchLabel =
+        when (state) {
+            CodeReviewState.Loading -> "Branch: —"
+            is CodeReviewState.Error -> "Branch: —"
+            is CodeReviewState.Content -> {
+                val source = state.pullRequest.sourceRefName.substringAfterLast("/")
+                "Branch: ${if (source.isBlank()) "—" else source}"
+            }
+        }
+    val encodingLabel = "UTF-8"
+    val languageLabel =
+        when (state) {
+            CodeReviewState.Loading -> "—"
+            is CodeReviewState.Error -> "—"
+            is CodeReviewState.Content -> fileLanguageLabel(state.selectedPath)
+        }
+    val lintLabel =
+        when (state) {
+            CodeReviewState.Loading -> "Lint: —"
+            is CodeReviewState.Error -> "Lint: —"
+            is CodeReviewState.Content -> lintStatusLabel(state.checks)
+        }
     Row(
         Modifier
             .fillMaxWidth()
@@ -442,16 +542,16 @@ private fun DiffFooter(state: CodeReviewState) {
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.CheckCircle, null, modifier = Modifier.size(16.dp), tint = EditorialColors.outline)
-                Text("Lint: Passed", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = EditorialColors.outline)
+                Text(lintLabel, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = EditorialColors.outline)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Sync, null, modifier = Modifier.size(16.dp), tint = EditorialColors.outline)
-                Text("Branch: feature/refactor-ledger", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = EditorialColors.outline)
+                Text(branchLabel, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = EditorialColors.outline)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("UTF-8", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = EditorialColors.outline)
-            Text("TypeScript JSX", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = EditorialColors.outline)
+            Text(encodingLabel, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = EditorialColors.outline)
+            Text(languageLabel, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = EditorialColors.outline)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(Modifier.size(8.dp).clip(CircleShape).background(EditorialColors.primary))
                 Text("+$added -$removed", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = EditorialColors.outline)
@@ -459,6 +559,61 @@ private fun DiffFooter(state: CodeReviewState) {
         }
     }
 }
+
+private fun fileLanguageLabel(path: String?): String {
+    val p = path?.trim().orEmpty()
+    if (p.isBlank()) return "—"
+    val ext = p.substringAfterLast('.', missingDelimiterValue = "").lowercase()
+    return when (ext) {
+        "kt", "kts" -> "Kotlin"
+        "java" -> "Java"
+        "js" -> "JavaScript"
+        "jsx" -> "JavaScript JSX"
+        "ts" -> "TypeScript"
+        "tsx" -> "TypeScript JSX"
+        "json" -> "JSON"
+        "md" -> "Markdown"
+        "yml", "yaml" -> "YAML"
+        "xml" -> "XML"
+        "html" -> "HTML"
+        "css" -> "CSS"
+        "gradle" -> "Gradle"
+        "properties" -> "Properties"
+        "txt" -> "Text"
+        "" -> "—"
+        else -> ext.uppercase()
+    }
+}
+
+private fun lintStatusLabel(checks: List<PullRequestCheckStatus>): String {
+    if (checks.isEmpty()) return "Lint: —"
+    val lint =
+        checks.firstOrNull { it.name.contains("lint", ignoreCase = true) }
+            ?: checks.firstOrNull { it.name.contains("ktlint", ignoreCase = true) }
+            ?: checks.firstOrNull { it.name.contains("detekt", ignoreCase = true) }
+
+    val state = lint?.state ?: aggregateCheckState(checks)
+    return "Lint: ${checkStateLabel(state)}"
+}
+
+private fun aggregateCheckState(checks: List<PullRequestCheckStatus>): PullRequestCheckState {
+    if (checks.any { it.state == PullRequestCheckState.Failed }) return PullRequestCheckState.Failed
+    if (checks.any { it.state == PullRequestCheckState.Running }) return PullRequestCheckState.Running
+    if (checks.any { it.state == PullRequestCheckState.Pending }) return PullRequestCheckState.Pending
+    if (checks.any { it.state == PullRequestCheckState.Succeeded }) return PullRequestCheckState.Succeeded
+    if (checks.any { it.state == PullRequestCheckState.NotApplicable }) return PullRequestCheckState.NotApplicable
+    return PullRequestCheckState.Unknown
+}
+
+private fun checkStateLabel(state: PullRequestCheckState): String =
+    when (state) {
+        PullRequestCheckState.Succeeded -> "Passed"
+        PullRequestCheckState.Failed -> "Failed"
+        PullRequestCheckState.Pending -> "Pending"
+        PullRequestCheckState.Running -> "Running"
+        PullRequestCheckState.NotApplicable -> "N/A"
+        PullRequestCheckState.Unknown -> "—"
+    }
 
 private data class DiffRender(
     val number: String,
@@ -505,3 +660,125 @@ private fun changeDotAndStrike(change: PullRequestChange): Pair<androidx.compose
         "edit", "modify" -> EditorialColors.tertiaryContainer to false
         else -> null to false
     }
+
+@Composable
+private fun FileNameLabel(
+    label: String,
+    modifier: Modifier = Modifier,
+    struck: Boolean,
+) {
+    val dot = label.lastIndexOf('.')
+    val slash = label.lastIndexOf('/')
+    val hasExtension = dot > slash && dot < label.length - 1
+    val base = if (hasExtension) label.substring(0, dot) else label
+    val ext = if (hasExtension) label.substring(dot) else ""
+
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(0.dp),
+    ) {
+        Text(
+            base,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            softWrap = false,
+            modifier = Modifier.weight(1f, fill = true),
+            textDecoration = if (struck) TextDecoration.LineThrough else TextDecoration.None,
+        )
+        if (ext.isNotBlank()) {
+            Text(
+                ext,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                softWrap = false,
+                color = EditorialColors.outline,
+                textDecoration = if (struck) TextDecoration.LineThrough else TextDecoration.None,
+            )
+        }
+    }
+}
+
+private sealed interface PathNode {
+    val name: String
+    val fullPath: String
+
+    data class Folder(
+        override val name: String,
+        override val fullPath: String,
+        val children: MutableList<PathNode> = mutableListOf(),
+    ) : PathNode
+
+    data class File(
+        override val name: String,
+        override val fullPath: String,
+    ) : PathNode
+}
+
+private data class VisibleNode(
+    val node: PathNode,
+    val depth: Int,
+)
+
+private fun buildPathTree(paths: List<String>): List<PathNode> {
+    val root = PathNode.Folder(name = "", fullPath = "")
+
+    fun upsertFolder(parent: PathNode.Folder, segment: String, fullPath: String): PathNode.Folder {
+        val existing =
+            parent.children
+                .filterIsInstance<PathNode.Folder>()
+                .firstOrNull { it.name == segment }
+        if (existing != null) return existing
+        return PathNode.Folder(name = segment, fullPath = fullPath).also { parent.children.add(it) }
+    }
+
+    paths
+        .map { it.trim().trimStart('/') }
+        .filter { it.isNotBlank() }
+        .forEach { raw ->
+            val segments = raw.split('/').filter { it.isNotBlank() }
+            var parent = root
+            var acc = ""
+            segments.forEachIndexed { idx, segment ->
+                acc = if (acc.isBlank()) segment else "$acc/$segment"
+                val isLast = idx == segments.lastIndex
+                if (isLast) {
+                    // ADO paths should be files, but be defensive in case a path ends with "/".
+                    val existingFile = parent.children.filterIsInstance<PathNode.File>().any { it.name == segment }
+                    if (!existingFile) parent.children.add(PathNode.File(name = segment, fullPath = "/$acc"))
+                } else {
+                    parent = upsertFolder(parent, segment, "/$acc")
+                }
+            }
+        }
+
+    fun sortFolder(folder: PathNode.Folder) {
+        folder.children.sortWith(
+            compareBy<PathNode> {
+                when (it) {
+                    is PathNode.Folder -> 0
+                    is PathNode.File -> 1
+                }
+            }.thenBy { it.name.lowercase() },
+        )
+        folder.children.filterIsInstance<PathNode.Folder>().forEach { sortFolder(it) }
+    }
+    sortFolder(root)
+
+    return root.children.toList()
+}
+
+private fun flattenVisible(nodes: List<PathNode>, expandedFolders: Set<String>): List<VisibleNode> {
+    val out = ArrayList<VisibleNode>(nodes.size)
+
+    fun visit(node: PathNode, depth: Int) {
+        out.add(VisibleNode(node, depth))
+        if (node is PathNode.Folder && expandedFolders.contains(node.fullPath)) {
+            node.children.forEach { visit(it, depth + 1) }
+        }
+    }
+
+    nodes.forEach { visit(it, depth = 0) }
+    return out
+}

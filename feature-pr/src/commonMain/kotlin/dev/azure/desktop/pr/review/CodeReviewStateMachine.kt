@@ -4,6 +4,7 @@ import com.freeletics.flowredux.dsl.FlowReduxStateMachine
 import dev.azure.desktop.domain.pr.GetPullRequestDetailUseCase
 import dev.azure.desktop.domain.pr.GetPullRequestFileDiffUseCase
 import dev.azure.desktop.domain.pr.PullRequestChange
+import dev.azure.desktop.domain.pr.PullRequestCheckStatus
 import dev.azure.desktop.domain.pr.PullRequestDiffLine
 import dev.azure.desktop.domain.pr.PullRequestSummary
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -18,6 +19,7 @@ sealed class CodeReviewState {
         val changes: List<PullRequestChange>,
         val selectedPath: String?,
         val diffLines: List<PullRequestDiffLine>,
+        val checks: List<PullRequestCheckStatus>,
     ) : CodeReviewState()
 
     data class Error(val message: String) : CodeReviewState()
@@ -134,6 +136,7 @@ class CodeReviewStateMachine(
                 changes = changes,
                 selectedPath = selected,
                 diffLines = diffLines,
+                checks = detail.checks,
             )
         }
     }

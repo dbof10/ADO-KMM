@@ -8,7 +8,10 @@ import dev.azure.desktop.domain.pr.ListProjectsUseCase
 import dev.azure.desktop.domain.pr.GetPullRequestDetailUseCase
 import dev.azure.desktop.domain.pr.GetPullRequestFileDiffUseCase
 import dev.azure.desktop.domain.pr.GetPullRequestLineStatsUseCase
+import dev.azure.desktop.domain.pr.FindPullRequestSummaryByIdUseCase
+import dev.azure.desktop.domain.pr.GetPullRequestSummaryByIdUseCase
 import dev.azure.desktop.domain.pr.RecordProjectSelectedUseCase
+import dev.azure.desktop.domain.pr.SetMyPullRequestVoteUseCase
 
 object JvmPullRequestServices {
     private val repository by lazy {
@@ -37,6 +40,18 @@ object JvmPullRequestServices {
     }
 
     val getPullRequestFileDiffUseCase by lazy { GetPullRequestFileDiffUseCase(repository) }
+
+    val findPullRequestSummaryByIdUseCase by lazy {
+        FindPullRequestSummaryByIdUseCase(
+            listProjectsUseCase = listProjectsUseCase,
+            getMyPullRequestsUseCase = getMyPullRequestsUseCase,
+            getActivePullRequestsUseCase = getActivePullRequestsUseCase,
+        )
+    }
+
+    val getPullRequestSummaryByIdUseCase by lazy { GetPullRequestSummaryByIdUseCase(repository) }
+
+    val setMyPullRequestVoteUseCase by lazy { SetMyPullRequestVoteUseCase(repository) }
 
     suspend fun getPullRequestChanges(
         organization: String,

@@ -18,6 +18,7 @@ import dev.azure.desktop.domain.pr.PullRequestSummary
 import dev.azure.desktop.login.LoginStateMachine
 import dev.azure.desktop.navigation.AppScreen
 import dev.azure.desktop.pr.detail.PrDetailState
+import dev.azure.desktop.pr.detail.PrDetailAction
 import dev.azure.desktop.pr.detail.PrDetailStateMachine
 import dev.azure.desktop.pr.review.CodeReviewStateMachine
 import dev.azure.desktop.pr.list.PrListStateMachine
@@ -53,6 +54,8 @@ fun App() {
                 listProjectsUseCase = JvmPullRequestServices.listProjectsUseCase,
                 getMyPullRequestsUseCase = JvmPullRequestServices.getMyPullRequestsUseCase,
                 getActivePullRequestsUseCase = JvmPullRequestServices.getActivePullRequestsUseCase,
+                findPullRequestSummaryByIdUseCase = JvmPullRequestServices.findPullRequestSummaryByIdUseCase,
+                getPullRequestSummaryByIdUseCase = JvmPullRequestServices.getPullRequestSummaryByIdUseCase,
                 getDefaultProjectNameUseCase = JvmPullRequestServices.getDefaultProjectNameUseCase,
                 recordProjectSelectedUseCase = JvmPullRequestServices.recordProjectSelectedUseCase,
             )
@@ -63,6 +66,7 @@ fun App() {
                     organization = organization,
                     summary = it,
                     getPullRequestDetailUseCase = JvmPullRequestServices.getPullRequestDetailUseCase,
+                    setMyPullRequestVoteUseCase = JvmPullRequestServices.setMyPullRequestVoteUseCase,
                 )
             }
         }
@@ -167,6 +171,10 @@ fun App() {
                                 is PrDetailState.Content ->
                                     PrOverviewScreen(
                                         detail = current.detail,
+                                        isVoting = current.isVoting,
+                                        voteErrorMessage = current.voteErrorMessage,
+                                        onApprove = { detailMachine.dispatch(PrDetailAction.Approve) },
+                                        onReject = { detailMachine.dispatch(PrDetailAction.Reject) },
                                         modifier = Modifier.fillMaxSize(),
                                     )
                             }

@@ -8,6 +8,7 @@ import java.util.prefs.Preferences
 
 private const val PreferencesNode = "dev.azure.desktop"
 private const val KeyPrefix = "project_selection_counts_v1:"
+private const val DebugProperty = "ado.debug.projectSelection"
 
 @Serializable
 private data class ProjectSelectionCounts(
@@ -31,11 +32,16 @@ class PreferencesProjectSelectionRepository(
             if (available.isEmpty()) return@runCatching null
 
             val data = loadCounts(org)
-            data.counts
+            val best =
+                data.counts
                 .asSequence()
                 .filter { (name, _) -> name in available }
                 .maxByOrNull { (_, count) -> count }
                 ?.key
+            debugLog(
+                "getDefaultProjectName org='$org' available=${available.size} stored=${data.counts.size} -> '$best'",
+            )
+            best
         }
 
     override suspend fun recordProjectSelected(
@@ -52,6 +58,7 @@ class PreferencesProjectSelectionRepository(
             val next = (nextCounts[project] ?: 0) + 1
             nextCounts[project] = next
             saveCounts(org, ProjectSelectionCounts(counts = nextCounts))
+            debugLog("recordProjectSelected org='$org' project='$project' -> count=$next")
         }
 
     private fun loadCounts(organization: String): ProjectSelectionCounts {
@@ -65,5 +72,11 @@ class PreferencesProjectSelectionRepository(
     }
 
     private fun keyFor(organization: String): String = KeyPrefix + organization.lowercase()
+
+    private fun debugLog(message: String) {
+        if (System.getProperty(DebugProperty) == "true") {
+            println("[ProjectSelection] $message")
+        }
+    }
 }
 

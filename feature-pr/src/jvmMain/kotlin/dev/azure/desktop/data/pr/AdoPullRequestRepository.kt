@@ -12,9 +12,14 @@ import dev.azure.desktop.domain.pr.PullRequestSummary
 import dev.azure.desktop.domain.pr.PullRequestTimelineItem
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
+import io.ktor.client.request.request
 import io.ktor.client.statement.bodyAsText
 import io.ktor.client.statement.HttpResponse
+import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
+import io.ktor.http.content.TextContent
+import io.ktor.http.contentType
 import io.ktor.http.encodeURLParameter
 import io.ktor.http.encodeURLPathPart
 import io.ktor.http.isSuccess
@@ -126,6 +131,28 @@ class AdoPullRequestRepository(
                 "Unable to load pull requests (${response.status.value})."
             }
             parseSummaryList(response.bodyAsText())
+        }
+
+    override suspend fun getPullRequestSummaryById(
+        organization: String,
+        projectName: String,
+        pullRequestId: Int,
+    ): Result<PullRequestSummary> =
+        runCatching {
+            require(organization.isNotBlank()) { "Missing organization." }
+            require(projectName.isNotBlank()) { "Missing project name." }
+            require(pullRequestId > 0) { "Invalid pull request id." }
+            val url =
+                "https://$Host/${organization.encodeURLPathPart()}/${projectName.encodeURLPathPart()}/" +
+                    "_apis/git/pullrequests/$pullRequestId?api-version=$ApiVersion"
+            val response = httpClient.get(url) {
+                headers.append(HttpHeaders.Authorization, basicAuth())
+            }
+            require(response.status.isSuccess()) {
+                "Unable to load pull request #$pullRequestId (${response.status.value})."
+            }
+            val root = json.parseToJsonElement(response.bodyAsText()).jsonObject
+            root.toSummary() ?: error("Pull request payload is invalid.")
         }
 
     private fun gitPullRequestsListUrl(
@@ -313,19 +340,67 @@ class AdoPullRequestRepository(
             require(path.isNotBlank()) { "Missing path." }
             require(commitId.isNotBlank()) { "Missing commit id." }
 
-            val url =
+            val baseUrl =
                 "https://$Host/${organization.encodeURLPathPart()}/${projectName.encodeURLPathPart()}/" +
                     "_apis/git/repositories/${repositoryId.encodeURLPathPart()}/items" +
                     "?path=${path.encodeURLPathPart()}" +
-                    "&includeContent=true" +
                     "&resolveLfs=true" +
                     "&versionDescriptor.version=$commitId" +
                     "&versionDescriptor.versionType=commit" +
                     "&api-version=$ApiVersion"
 
-            val response: HttpResponse = httpClient.get(url) { headers.append(HttpHeaders.Authorization, basicAuth()) }
-            if (!response.status.isSuccess()) return@runCatching null
-            response.bodyAsText()
+            // ADO intermittently returns 500 when includeContent=true is used on folder paths.
+            // We first probe metadata to detect folders, then fetch content only for files.
+            val metaResponse: HttpResponse =
+                httpClient.get("$baseUrl&includeContentMetadata=true") {
+                    headers.append(HttpHeaders.Authorization, basicAuth())
+                }
+            if (!metaResponse.status.isSuccess()) return@runCatching null
+
+            val metaRaw = metaResponse.bodyAsText()
+            val isFolder =
+                runCatching {
+                    json.parseToJsonElement(metaRaw).jsonObject["isFolder"].jsonBooleanOrNull() == true
+                }.getOrDefault(false)
+            if (isFolder) return@runCatching null
+
+            val contentResponse: HttpResponse =
+                httpClient.get("$baseUrl&includeContent=true") {
+                    headers.append(HttpHeaders.Authorization, basicAuth())
+                }
+            if (!contentResponse.status.isSuccess()) return@runCatching null
+            contentResponse.bodyAsText()
+        }
+
+    override suspend fun setMyPullRequestVote(
+        organization: String,
+        projectName: String,
+        repositoryId: String,
+        pullRequestId: Int,
+        vote: Int,
+    ): Result<Unit> =
+        runCatching {
+            require(organization.isNotBlank()) { "Missing organization." }
+            require(projectName.isNotBlank()) { "Missing project name." }
+            require(repositoryId.isNotBlank()) { "Missing repository id." }
+            require(pullRequestId > 0) { "Invalid pull request id." }
+
+            val reviewerId = getAuthenticatedUserId(organization)
+            val url =
+                "https://$Host/${organization.encodeURLPathPart()}/${projectName.encodeURLPathPart()}/" +
+                    "_apis/git/repositories/${repositoryId.encodeURLPathPart()}/pullRequests/$pullRequestId/" +
+                    "reviewers/${reviewerId.encodeURLPathPart()}?api-version=$ApiVersion"
+
+            val response =
+                httpClient.request(url) {
+                    method = HttpMethod.Put
+                    headers.append(HttpHeaders.Authorization, basicAuth())
+                    body = TextContent("""{"vote":$vote}""", ContentType.Application.Json)
+                }
+
+            require(response.status.isSuccess()) {
+                "Unable to update vote (${response.status.value})."
+            }
         }
 
     private fun basicAuth(): String {

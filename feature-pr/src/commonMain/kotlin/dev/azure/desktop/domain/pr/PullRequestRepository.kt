@@ -7,6 +7,17 @@ interface PullRequestRepository {
 
     suspend fun getActivePullRequests(organization: String, projectName: String?): Result<List<PullRequestSummary>>
 
+    /**
+     * Fetch a pull request directly by id (works for completed/abandoned too).
+     *
+     * Azure DevOps endpoint: `/_apis/git/pullrequests/{pullRequestId}` (project-scoped).
+     */
+    suspend fun getPullRequestSummaryById(
+        organization: String,
+        projectName: String,
+        pullRequestId: Int,
+    ): Result<PullRequestSummary>
+
     suspend fun getPullRequestDetail(
         organization: String,
         projectName: String,
@@ -33,4 +44,20 @@ interface PullRequestRepository {
         path: String,
         commitId: String,
     ): Result<String?>
+
+    /**
+     * Sets the authenticated user's vote on a pull request.
+     *
+     * Common values:
+     * - 10: Approved
+     * - -10: Rejected
+     * - 0: Reset / waiting
+     */
+    suspend fun setMyPullRequestVote(
+        organization: String,
+        projectName: String,
+        repositoryId: String,
+        pullRequestId: Int,
+        vote: Int,
+    ): Result<Unit>
 }

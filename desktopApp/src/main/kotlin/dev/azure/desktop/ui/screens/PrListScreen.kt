@@ -22,6 +22,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
@@ -57,6 +58,7 @@ fun PrListScreen(
 ) {
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<PrListState>(PrListState.LoadingProjects) }
+    var prNumberInput by remember { mutableStateOf("") }
     LaunchedEffect(stateMachine) {
         stateMachine.state.collect { state = it }
     }
@@ -97,6 +99,16 @@ fun PrListScreen(
                         selectedProjectName = current.selectedProjectName,
                         selectedTab = current.tab,
                         projectMenuEnabled = false,
+                        rightOfProjectSelector = {
+                            OpenPrByNumber(
+                                prNumberInput = prNumberInput,
+                                onPrNumberInputChange = { prNumberInput = it },
+                                onOpen = { id ->
+                                    scope.launch { stateMachine.dispatch(PrListAction.OpenPullRequestById(id)) }
+                                },
+                                enabled = true,
+                            )
+                        },
                         onSelectProject = { scope.launch { stateMachine.dispatch(PrListAction.SelectProject(it)) } },
                         onSelectTab = { scope.launch { stateMachine.dispatch(PrListAction.SelectTab(it)) } },
                     )
@@ -115,10 +127,30 @@ fun PrListScreen(
                         selectedProjectName = current.selectedProjectName,
                         selectedTab = current.tab,
                         projectMenuEnabled = true,
+                        rightOfProjectSelector = {
+                            OpenPrByNumber(
+                                prNumberInput = prNumberInput,
+                                onPrNumberInputChange = { prNumberInput = it },
+                                onOpen = { id ->
+                                    scope.launch { stateMachine.dispatch(PrListAction.OpenPullRequestById(id)) }
+                                },
+                                enabled = true,
+                            )
+                        },
                         onSelectProject = { scope.launch { stateMachine.dispatch(PrListAction.SelectProject(it)) } },
                         onSelectTab = { scope.launch { stateMachine.dispatch(PrListAction.SelectTab(it)) } },
                     )
                     Spacer(Modifier.height(12.dp))
+                    current.openPullRequestError?.let { msg ->
+                        Text(msg, color = EditorialColors.error)
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    current.pendingOpenPullRequest?.let { summary ->
+                        LaunchedEffect(summary.id) {
+                            onOpenPullRequest(summary)
+                            stateMachine.dispatch(PrListAction.ConsumePendingOpenPullRequest)
+                        }
+                    }
                     Surface(
                         color = EditorialColors.surfaceContainerLowest,
                         shape = RoundedCornerShape(12.dp),
@@ -137,6 +169,16 @@ fun PrListScreen(
                         selectedProjectName = current.selectedProjectName,
                         selectedTab = current.tab,
                         projectMenuEnabled = true,
+                        rightOfProjectSelector = {
+                            OpenPrByNumber(
+                                prNumberInput = prNumberInput,
+                                onPrNumberInputChange = { prNumberInput = it },
+                                onOpen = { id ->
+                                    scope.launch { stateMachine.dispatch(PrListAction.OpenPullRequestById(id)) }
+                                },
+                                enabled = true,
+                            )
+                        },
                         onSelectProject = { scope.launch { stateMachine.dispatch(PrListAction.SelectProject(it)) } },
                         onSelectTab = { scope.launch { stateMachine.dispatch(PrListAction.SelectTab(it)) } },
                     )
@@ -163,18 +205,27 @@ private fun ProjectAndTabsRow(
     selectedProjectName: String?,
     selectedTab: PrListTab,
     projectMenuEnabled: Boolean,
+    rightOfProjectSelector: @Composable (() -> Unit)? = null,
     onSelectProject: (String?) -> Unit,
     onSelectTab: (PrListTab) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Project", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-        ProjectDropdown(
-            projects = projects,
-            selectedProjectName = selectedProjectName,
-            enabled = projectMenuEnabled,
-            modifier = Modifier.fillMaxWidth(0.25f),
-            onSelect = onSelectProject,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ProjectDropdown(
+                projects = projects,
+                selectedProjectName = selectedProjectName,
+                enabled = projectMenuEnabled,
+                modifier = Modifier.fillMaxWidth(0.25f),
+                onSelect = onSelectProject,
+            )
+            Spacer(Modifier.weight(1f))
+            rightOfProjectSelector?.invoke()
+        }
         TabRow(
             selectedTabIndex = if (selectedTab == PrListTab.Mine) 0 else 1,
             containerColor = EditorialColors.surfaceContainerLow,
@@ -203,6 +254,37 @@ private fun ProjectAndTabsRow(
                 unselectedContentColor = EditorialColors.onSurfaceVariant,
                 text = { Text("Active", fontWeight = if (selectedTab == PrListTab.Active) FontWeight.Bold else FontWeight.Medium) },
             )
+        }
+    }
+}
+
+@Composable
+private fun OpenPrByNumber(
+    prNumberInput: String,
+    onPrNumberInputChange: (String) -> Unit,
+    onOpen: (Int) -> Unit,
+    enabled: Boolean,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        OutlinedTextField(
+            value = prNumberInput,
+            onValueChange = { raw -> onPrNumberInputChange(raw.filter { ch -> ch.isDigit() }.take(12)) },
+            modifier = Modifier.width(220.dp),
+            singleLine = true,
+            label = { Text("Open PR by #") },
+            placeholder = { Text("130041") },
+        )
+        Button(
+            onClick = {
+                val id = prNumberInput.trim().toIntOrNull() ?: return@Button
+                onOpen(id)
+            },
+            enabled = enabled && prNumberInput.trim().isNotBlank(),
+        ) {
+            Text("Open")
         }
     }
 }
