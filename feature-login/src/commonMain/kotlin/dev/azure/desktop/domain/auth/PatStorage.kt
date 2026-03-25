@@ -8,5 +8,14 @@ interface PatStorage {
 
     fun loadPat(): String?
 
-    fun clearPat()
+    /** Persists the organization name for API calls and re-login after an expired token. */
+    fun saveOrganization(name: String): Result<Unit>
+
+    fun loadOrganization(): String?
+
+    /** Full sign out: removes PAT and organization. */
+    fun clearCredentials()
+
+    /** Removes only the PAT (e.g. expired token); keeps organization when possible. */
+    fun clearPatOnly()
 }

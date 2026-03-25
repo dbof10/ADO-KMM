@@ -2,7 +2,9 @@ package dev.azure.desktop
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -16,6 +18,7 @@ import dev.azure.desktop.ui.screens.DesignSystemScreen
 import dev.azure.desktop.ui.screens.LoginScreen
 import dev.azure.desktop.ui.screens.PrOverviewScreen
 import dev.azure.desktop.ui.shell.MainShell
+import javax.swing.SwingUtilities
 
 @Composable
 fun App() {
@@ -28,18 +31,36 @@ fun App() {
         val loginStateMachine = remember(loginMachineEpoch) {
             LoginStateMachine(JvmAuthServices.verifyAndStorePat)
         }
+
+        val authActions = remember { object { lateinit var onSessionExpiredFromHttp: () -> Unit } }
+        authActions.onSessionExpiredFromHttp = {
+            JvmAuthServices.patStorage.clearPatOnly()
+            loginMachineEpoch++
+            screen.value = AppScreen.Login
+        }
+
+        DisposableEffect(Unit) {
+            JvmAuthServices.setOnSessionUnauthorized {
+                SwingUtilities.invokeLater { authActions.onSessionExpiredFromHttp() }
+            }
+            onDispose { JvmAuthServices.setOnSessionUnauthorized { } }
+        }
+
         val signOut: () -> Unit = {
-            JvmAuthServices.patStorage.clearPat()
+            JvmAuthServices.patStorage.clearCredentials()
             loginMachineEpoch++
             screen.value = AppScreen.Login
         }
 
         when (screen.value) {
             AppScreen.Login ->
-                LoginScreen(
-                    stateMachine = loginStateMachine,
-                    onLoggedIn = { screen.value = AppScreen.PrOverview },
-                )
+                key(loginMachineEpoch) {
+                    LoginScreen(
+                        stateMachine = loginStateMachine,
+                        initialOrganization = JvmAuthServices.patStorage.loadOrganization().orEmpty(),
+                        onLoggedIn = { screen.value = AppScreen.PrOverview },
+                    )
+                }
 
             AppScreen.PrOverview ->
                 MainShell(

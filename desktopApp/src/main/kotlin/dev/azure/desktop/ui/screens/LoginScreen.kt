@@ -61,8 +61,9 @@ import kotlinx.coroutines.launch
 fun LoginScreen(
     stateMachine: LoginStateMachine,
     onLoggedIn: () -> Unit,
+    initialOrganization: String = "",
 ) {
-    val organization = remember { mutableStateOf("") }
+    val organization = remember(initialOrganization) { mutableStateOf(initialOrganization) }
     val pat = remember { mutableStateOf("") }
     val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()

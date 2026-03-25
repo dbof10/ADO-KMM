@@ -8,6 +8,7 @@ import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.http.HttpHeaders
+import java.util.concurrent.atomic.AtomicReference
 
 private val networkLogger =
     object : Logger {
@@ -16,8 +17,8 @@ private val networkLogger =
         }
     }
 
-object JvmAuthServices {
-    private val httpClient: HttpClient = HttpClient(CIO) {
+private fun baseHttpClient(): HttpClient =
+    HttpClient(CIO) {
         followRedirects = true
         install(Logging) {
             logger = networkLogger
@@ -26,8 +27,27 @@ object JvmAuthServices {
         }
     }
 
+object JvmAuthServices {
+    private val onSessionUnauthorizedRef = AtomicReference<() -> Unit>({})
+
+    fun setOnSessionUnauthorized(handler: () -> Unit) {
+        onSessionUnauthorizedRef.set(handler)
+    }
+
+    /** PAT entry flow only; 401 here must not trigger global sign-out. */
+    private val patVerificationHttpClient: HttpClient = baseHttpClient()
+
+    /** All authenticated ADO calls; 401 runs [setOnSessionUnauthorized] (post to UI thread there), then throws. */
+    val sessionHttpClient: HttpClient by lazy {
+        baseHttpClient().also { client ->
+            client.installAdoUnauthorizedMiddleware {
+                onSessionUnauthorizedRef.get().invoke()
+            }
+        }
+    }
+
     val patStorage: PatStorage = OsCredentialPatStorage()
 
     val verifyAndStorePat: VerifyAndStorePatUseCase =
-        VerifyAndStorePatUseCase(AdoRestPatVerifier(httpClient), patStorage)
+        VerifyAndStorePatUseCase(AdoRestPatVerifier(patVerificationHttpClient), patStorage)
 }

@@ -18,7 +18,12 @@ class VerifyAndStorePatUseCase(
         }
         return withContext(Dispatchers.IO) {
             verifier.verify(trimmedOrg, trimmed).fold(
-                onSuccess = { storage.savePat(trimmed) },
+                onSuccess = {
+                    storage.savePat(trimmed).fold(
+                        onSuccess = { storage.saveOrganization(trimmedOrg) },
+                        onFailure = { Result.failure(it) },
+                    )
+                },
                 onFailure = { Result.failure(it) },
             )
         }

@@ -6,8 +6,8 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
-import io.ktor.http.isSuccess
 import io.ktor.http.encodeURLPathPart
+import io.ktor.http.isSuccess
 import java.util.Base64
 
 private const val ConnectionDataPathSuffix = "/_apis/connectiondata"
@@ -35,10 +35,7 @@ class AdoRestPatVerifier(
             val endedAtExpectedApi =
                 response.call.request.url.host.equals(ExpectedHost, ignoreCase = true) &&
                     response.call.request.url.encodedPath == expectedPath
-            val accepted =
-                response.status.isSuccess() &&
-                    isJsonResponse &&
-                    endedAtExpectedApi
+            val accepted = response.status.isSuccess() && isJsonResponse && endedAtExpectedApi
 
             if (!accepted) {
                 val hint = body.take(200)
