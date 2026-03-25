@@ -2,10 +2,12 @@ package dev.azure.desktop.pr.list
 
 import com.freeletics.flowredux.dsl.FlowReduxStateMachine
 import dev.azure.desktop.domain.pr.DevOpsProject
+import dev.azure.desktop.domain.pr.GetDefaultProjectNameUseCase
 import dev.azure.desktop.domain.pr.GetActivePullRequestsUseCase
 import dev.azure.desktop.domain.pr.GetMyPullRequestsUseCase
 import dev.azure.desktop.domain.pr.ListProjectsUseCase
 import dev.azure.desktop.domain.pr.PullRequestSummary
+import dev.azure.desktop.domain.pr.RecordProjectSelectedUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 enum class PrListTab {
@@ -56,6 +58,8 @@ class PrListStateMachine(
     private val listProjectsUseCase: ListProjectsUseCase,
     private val getMyPullRequestsUseCase: GetMyPullRequestsUseCase,
     private val getActivePullRequestsUseCase: GetActivePullRequestsUseCase,
+    private val getDefaultProjectNameUseCase: GetDefaultProjectNameUseCase,
+    private val recordProjectSelectedUseCase: RecordProjectSelectedUseCase,
 ) : FlowReduxStateMachine<PrListState, PrListAction>(PrListState.LoadingProjects) {
     init {
         spec {
@@ -64,7 +68,10 @@ class PrListStateMachine(
                     listProjectsUseCase(organization).fold(
                         onSuccess = { projects ->
                             val sorted = projects.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
-                            val defaultProject = sorted.firstOrNull()?.name
+                            val defaultProject =
+                                getDefaultProjectNameUseCase(organization, sorted.map { it.name })
+                                    .getOrNull()
+                                    ?: sorted.firstOrNull()?.name
                             state.override {
                                 PrListState.LoadingPullRequests(
                                     projects = sorted,
@@ -127,6 +134,7 @@ class PrListStateMachine(
                     if (action.projectName == snap.selectedProjectName) {
                         state.noChange()
                     } else {
+                        action.projectName?.let { recordProjectSelectedUseCase(organization, it) }
                         state.override {
                             PrListState.LoadingPullRequests(
                                 projects = snap.projects,
@@ -168,6 +176,7 @@ class PrListStateMachine(
                     if (action.projectName == snap.selectedProjectName) {
                         state.noChange()
                     } else {
+                        action.projectName?.let { recordProjectSelectedUseCase(organization, it) }
                         state.override {
                             PrListState.LoadingPullRequests(
                                 projects = snap.projects,
@@ -209,6 +218,7 @@ class PrListStateMachine(
                     if (action.projectName == snap.selectedProjectName) {
                         state.noChange()
                     } else {
+                        action.projectName?.let { recordProjectSelectedUseCase(organization, it) }
                         state.override {
                             PrListState.LoadingPullRequests(
                                 projects = snap.projects,

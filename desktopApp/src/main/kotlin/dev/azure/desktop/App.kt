@@ -53,6 +53,8 @@ fun App() {
                 listProjectsUseCase = JvmPullRequestServices.listProjectsUseCase,
                 getMyPullRequestsUseCase = JvmPullRequestServices.getMyPullRequestsUseCase,
                 getActivePullRequestsUseCase = JvmPullRequestServices.getActivePullRequestsUseCase,
+                getDefaultProjectNameUseCase = JvmPullRequestServices.getDefaultProjectNameUseCase,
+                recordProjectSelectedUseCase = JvmPullRequestServices.recordProjectSelectedUseCase,
             )
         }
         val prDetailStateMachine = remember(selectedPullRequest, organization, loginMachineEpoch) {
