@@ -41,10 +41,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.azure.desktop.domain.pr.PullRequestDetail
+import dev.azure.desktop.domain.pr.PullRequestReviewer
 import dev.azure.desktop.theme.EditorialColors
 
 @Composable
-fun PrOverviewScreen(modifier: Modifier = Modifier) {
+fun PrOverviewScreen(
+    detail: PullRequestDetail,
+    modifier: Modifier = Modifier,
+) {
+    val summary = detail.summary
     Box(modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
@@ -66,11 +72,11 @@ fun PrOverviewScreen(modifier: Modifier = Modifier) {
                         fontSize = 10.sp,
                     )
                 }
-                Text("PR #1204", style = MaterialTheme.typography.bodySmall, color = EditorialColors.outline, fontWeight = FontWeight.Medium)
+                Text("PR #${summary.id}", style = MaterialTheme.typography.bodySmall, color = EditorialColors.outline, fontWeight = FontWeight.Medium)
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                "Refactor Cloud-Native Service Mesh Architecture",
+                summary.title,
                 style = MaterialTheme.typography.headlineSmall.copy(fontSize = 28.sp, fontWeight = FontWeight.ExtraBold),
                 color = EditorialColors.onSurface,
             )
@@ -82,9 +88,10 @@ fun PrOverviewScreen(modifier: Modifier = Modifier) {
                         .clip(CircleShape)
                         .background(EditorialColors.primaryContainer),
                 )
-                Text("Jordan S.", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                Text(summary.creatorDisplayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "wants to merge 12 commits into main from feature/mesh-optimization",
+                    "wants to merge into ${summary.targetRefName.substringAfterLast("/")}" +
+                        " from ${summary.sourceRefName.substringAfterLast("/")}",
                     style = MaterialTheme.typography.bodySmall,
                     color = EditorialColors.onSurfaceVariant,
                 )
@@ -107,7 +114,7 @@ fun PrOverviewScreen(modifier: Modifier = Modifier) {
                             }
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                "This PR introduces a more resilient service mesh pattern to handle intermittent network partitions in the European cluster.",
+                                detail.description?.takeIf { it.isNotBlank() } ?: "No description was provided.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = EditorialColors.onSurfaceVariant,
                             )
@@ -116,7 +123,7 @@ fun PrOverviewScreen(modifier: Modifier = Modifier) {
                     ActivityTimeline()
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                    ReviewersCard()
+                    ReviewersCard(detail.reviewers)
                     LinkedItemsCard()
                     StatsCard()
                 }
@@ -211,37 +218,36 @@ private fun TimelineCommit() {
 }
 
 @Composable
-private fun ReviewersCard() {
+private fun ReviewersCard(reviewers: List<PullRequestReviewer>) {
     Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(EditorialColors.surfaceContainerLowest)) {
         Column(Modifier.padding(20.dp)) {
             Text("REVIEWERS", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(32.dp).clip(CircleShape).background(EditorialColors.surfaceContainerHigh))
-                    Column {
-                        Text("Alex Chen", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                        Text("INFRASTRUCTURE TEAM", fontSize = 9.sp, color = EditorialColors.outline, fontWeight = FontWeight.Bold)
+            reviewers.take(6).forEachIndexed { index, reviewer ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(32.dp).clip(CircleShape).background(EditorialColors.surfaceContainerHigh))
+                        Column {
+                            Text(reviewer.displayName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                            Text(reviewer.uniqueName.orEmpty(), fontSize = 9.sp, color = EditorialColors.outline, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            if (reviewer.vote >= 10) Icons.Filled.CheckCircle else Icons.Outlined.Schedule,
+                            null,
+                            tint = if (reviewer.vote >= 10) EditorialColors.primary else EditorialColors.outline,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Text(
+                            if (reviewer.vote >= 10) "Approved" else "Waiting",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (reviewer.vote >= 10) EditorialColors.primary else EditorialColors.outline,
+                        )
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.CheckCircle, null, tint = EditorialColors.primary, modifier = Modifier.size(18.dp))
-                    Text("Approved", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = EditorialColors.primary)
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(32.dp).clip(CircleShape).background(EditorialColors.surfaceContainerHigh))
-                    Column {
-                        Text("Sarah Miller", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, color = EditorialColors.onSurface.copy(alpha = 0.6f))
-                        Text("BACKEND CORE", fontSize = 9.sp, color = EditorialColors.outline, fontWeight = FontWeight.Bold)
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.Schedule, null, tint = EditorialColors.outline, modifier = Modifier.size(18.dp))
-                    Text("Waiting", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = EditorialColors.outline)
-                }
+                if (index != reviewers.lastIndex) Spacer(Modifier.height(12.dp))
             }
         }
     }

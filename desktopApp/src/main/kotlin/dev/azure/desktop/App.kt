@@ -3,19 +3,28 @@ package dev.azure.desktop
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import dev.azure.desktop.data.auth.JvmAuthServices
+import dev.azure.desktop.data.pr.JvmPullRequestServices
+import dev.azure.desktop.domain.pr.PullRequestSummary
 import dev.azure.desktop.login.LoginStateMachine
 import dev.azure.desktop.navigation.AppScreen
+import dev.azure.desktop.pr.detail.PrDetailState
+import dev.azure.desktop.pr.detail.PrDetailStateMachine
+import dev.azure.desktop.pr.list.PrListStateMachine
 import dev.azure.desktop.theme.EditorialTheme
 import dev.azure.desktop.ui.screens.CodeReviewScreen
 import dev.azure.desktop.ui.screens.DesignSystemScreen
 import dev.azure.desktop.ui.screens.LoginScreen
+import dev.azure.desktop.ui.screens.PrListScreen
 import dev.azure.desktop.ui.screens.PrOverviewScreen
 import dev.azure.desktop.ui.shell.MainShell
 import javax.swing.SwingUtilities
@@ -23,13 +32,34 @@ import javax.swing.SwingUtilities
 @Composable
 fun App() {
     EditorialTheme {
-        val hasStoredPat = remember { JvmAuthServices.patStorage.loadPat() != null }
-        val screen = remember {
-            mutableStateOf(if (hasStoredPat) AppScreen.PrOverview else AppScreen.Login)
+        val initialPat = remember { JvmAuthServices.patStorage.loadPat() }
+        val initialOrganization = remember { JvmAuthServices.patStorage.loadOrganization().orEmpty() }
+        val hasStoredSession = remember(initialPat, initialOrganization) {
+            initialPat != null && initialOrganization.isNotBlank()
         }
+        var organization by remember { mutableStateOf(initialOrganization) }
+        val screen = remember {
+            mutableStateOf(if (hasStoredSession) AppScreen.PrList else AppScreen.Login)
+        }
+        var selectedPullRequest by remember { mutableStateOf<PullRequestSummary?>(null) }
         var loginMachineEpoch by remember { mutableStateOf(0) }
         val loginStateMachine = remember(loginMachineEpoch) {
             LoginStateMachine(JvmAuthServices.verifyAndStorePat)
+        }
+        val prListStateMachine = remember(organization, loginMachineEpoch) {
+            PrListStateMachine(
+                organization = organization,
+                getMyPullRequestsUseCase = JvmPullRequestServices.getMyPullRequestsUseCase,
+            )
+        }
+        val prDetailStateMachine = remember(selectedPullRequest, organization, loginMachineEpoch) {
+            selectedPullRequest?.let {
+                PrDetailStateMachine(
+                    organization = organization,
+                    summary = it,
+                    getPullRequestDetailUseCase = JvmPullRequestServices.getPullRequestDetailUseCase,
+                )
+            }
         }
 
         val authActions = remember { object { lateinit var onSessionExpiredFromHttp: () -> Unit } }
@@ -37,6 +67,8 @@ fun App() {
             JvmAuthServices.patStorage.clearPatOnly()
             loginMachineEpoch++
             screen.value = AppScreen.Login
+            selectedPullRequest = null
+            organization = JvmAuthServices.patStorage.loadOrganization().orEmpty()
         }
 
         DisposableEffect(Unit) {
@@ -50,6 +82,8 @@ fun App() {
             JvmAuthServices.patStorage.clearCredentials()
             loginMachineEpoch++
             screen.value = AppScreen.Login
+            selectedPullRequest = null
+            organization = ""
         }
 
         when (screen.value) {
@@ -58,17 +92,60 @@ fun App() {
                     LoginScreen(
                         stateMachine = loginStateMachine,
                         initialOrganization = JvmAuthServices.patStorage.loadOrganization().orEmpty(),
-                        onLoggedIn = { screen.value = AppScreen.PrOverview },
+                        onLoggedIn = {
+                            organization = JvmAuthServices.patStorage.loadOrganization().orEmpty()
+                            screen.value = if (organization.isNotBlank()) AppScreen.PrList else AppScreen.Login
+                        },
                     )
                 }
 
-            AppScreen.PrOverview ->
+            AppScreen.PrList ->
                 MainShell(
-                    screen = AppScreen.PrOverview,
+                    screen = AppScreen.PrList,
                     onNavigate = { screen.value = it },
                     onSignOut = signOut,
                     content = {
-                        PrOverviewScreen(Modifier.fillMaxSize())
+                        PrListScreen(
+                            stateMachine = prListStateMachine,
+                            onOpenPullRequest = {
+                                selectedPullRequest = it
+                                screen.value = AppScreen.PrDetail
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    },
+                )
+
+            AppScreen.PrDetail ->
+                MainShell(
+                    screen = AppScreen.PrDetail,
+                    onNavigate = { screen.value = it },
+                    onSignOut = signOut,
+                    content = {
+                        val detailMachine = prDetailStateMachine
+                        if (detailMachine == null) {
+                            screen.value = AppScreen.PrList
+                        } else {
+                            var detailState by remember(detailMachine) {
+                                mutableStateOf<PrDetailState>(
+                                    PrDetailState.Loading,
+                                )
+                            }
+                            LaunchedEffect(detailMachine) {
+                                detailMachine.state.collect { detailState = it }
+                            }
+                            when (val current = detailState) {
+                                PrDetailState.Loading -> CircularProgressIndicator()
+
+                                is PrDetailState.Error -> Text(current.message)
+
+                                is PrDetailState.Content ->
+                                    PrOverviewScreen(
+                                        detail = current.detail,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                            }
+                        }
                     },
                 )
 
@@ -89,7 +166,7 @@ fun App() {
                     onSignOut = signOut,
                     content = {
                         DesignSystemScreen(
-                            onBack = { screen.value = AppScreen.PrOverview },
+                            onBack = { screen.value = AppScreen.PrList },
                             modifier = Modifier.fillMaxSize(),
                         )
                     },

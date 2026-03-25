@@ -19,23 +19,25 @@ internal fun MainShell(
     content: @Composable () -> Unit,
 ) {
     val tab: MainTab? = when (screen) {
-        AppScreen.PrOverview -> MainTab.Overview
+        AppScreen.PrList -> MainTab.Overview
+        AppScreen.PrDetail -> MainTab.Overview
         AppScreen.CodeReview -> MainTab.Files
         AppScreen.DesignSystem -> null
         AppScreen.Login -> null
     }
     val topNav = when (screen) {
-        AppScreen.PrOverview -> TopNavSection.PullRequests
+        AppScreen.PrList -> TopNavSection.PullRequests
+        AppScreen.PrDetail -> TopNavSection.PullRequests
         AppScreen.CodeReview -> TopNavSection.Repositories
         AppScreen.DesignSystem -> TopNavSection.PullRequests
         AppScreen.Login -> TopNavSection.PullRequests
     }
-    val showSearch = screen == AppScreen.PrOverview
+    val showSearch = screen == AppScreen.PrList
 
     Row(Modifier.fillMaxSize().background(EditorialColors.surface)) {
         SideRail(
             selected = tab,
-            onOverview = { onNavigate(AppScreen.PrOverview) },
+            onOverview = { onNavigate(AppScreen.PrList) },
             onFiles = { onNavigate(AppScreen.CodeReview) },
             onSettings = { onNavigate(AppScreen.DesignSystem) },
             onSignOut = onSignOut,
@@ -46,7 +48,7 @@ internal fun MainShell(
                 activeTopNav = topNav,
                 onTopNavSelect = { section ->
                     when (section) {
-                        TopNavSection.PullRequests -> onNavigate(AppScreen.PrOverview)
+                        TopNavSection.PullRequests -> onNavigate(AppScreen.PrList)
                         TopNavSection.Repositories -> onNavigate(AppScreen.CodeReview)
                         TopNavSection.Pipelines -> { }
                     }

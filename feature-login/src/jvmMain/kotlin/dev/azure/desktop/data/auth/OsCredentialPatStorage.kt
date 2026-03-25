@@ -2,7 +2,6 @@ package dev.azure.desktop.data.auth
 
 import com.microsoft.credentialstorage.SecretStore
 import com.microsoft.credentialstorage.StorageProvider
-import com.microsoft.credentialstorage.model.StoredCredential
 import com.microsoft.credentialstorage.model.StoredToken
 import com.microsoft.credentialstorage.model.StoredTokenType
 import dev.azure.desktop.domain.auth.PatStorage
@@ -14,15 +13,13 @@ private const val OrgKey = "dev.azure.desktop.ado_org"
  * Stores the PAT in the OS credential store via
  * [com.microsoft.credentialstorage](https://github.com/microsoft/credential-secure-storage-for-java)
  * (macOS Keychain, Windows Credential Manager, Linux libsecret / GNOME Keyring when available).
- * Organization name is stored as a generic credential (username field).
+ * Organization name is stored as a token to avoid nullable-password
+ * edge cases in credential retrieval on some environments.
  */
 class OsCredentialPatStorage : PatStorage {
 
     private val tokenStore: SecretStore<StoredToken>? =
         StorageProvider.getTokenStorage(true, StorageProvider.SecureOption.REQUIRED)
-
-    private val credentialStore: SecretStore<StoredCredential>? =
-        StorageProvider.getCredentialStorage(true, StorageProvider.SecureOption.REQUIRED)
 
     override fun savePat(pat: String): Result<Unit> =
         runCatching {
@@ -47,35 +44,34 @@ class OsCredentialPatStorage : PatStorage {
     override fun saveOrganization(name: String): Result<Unit> =
         runCatching {
             val trimmed = name.trim()
-            val s = credentialStore ?: error(NO_STORE_MESSAGE)
+            val s = tokenStore ?: error(NO_STORE_MESSAGE)
             s.delete(OrgKey)
             if (trimmed.isEmpty()) {
                 return@runCatching
             }
-            val emptyPassword = charArrayOf()
-            val cred = StoredCredential(trimmed, emptyPassword)
+            val token = StoredToken(trimmed.toCharArray(), StoredTokenType.PERSONAL)
             try {
-                if (!s.add(OrgKey, cred)) {
+                if (!s.add(OrgKey, token)) {
                     error("Could not save the organization to the OS credential store.")
                 }
             } finally {
-                cred.clear()
+                token.clear()
             }
         }
 
     override fun loadOrganization(): String? {
-        val s = credentialStore ?: return null
-        val cred = s.get(OrgKey) ?: return null
+        val s = tokenStore ?: return null
+        val token = s.get(OrgKey) ?: return null
         return try {
-            cred.username.takeIf { it.isNotBlank() }
+            String(token.value).trim().takeIf { it.isNotBlank() }
         } finally {
-            cred.clear()
+            token.clear()
         }
     }
 
     override fun clearCredentials() {
         tokenStore?.delete(PatKey)
-        credentialStore?.delete(OrgKey)
+        tokenStore?.delete(OrgKey)
     }
 
     override fun clearPatOnly() {

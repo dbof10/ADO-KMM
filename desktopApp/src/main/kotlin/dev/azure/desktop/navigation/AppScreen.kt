@@ -2,7 +2,8 @@ package dev.azure.desktop.navigation
 
 enum class AppScreen {
     Login,
-    PrOverview,
+    PrList,
+    PrDetail,
     CodeReview,
     /** Stitch canvas design-system asset (tokens + spec); UI-only reference. */
     DesignSystem,
