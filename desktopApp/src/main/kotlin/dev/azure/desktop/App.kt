@@ -15,7 +15,9 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import dev.azure.desktop.data.auth.JvmAuthServices
 import dev.azure.desktop.data.pr.JvmPullRequestServices
+import dev.azure.desktop.data.release.JvmReleaseServices
 import dev.azure.desktop.domain.pr.PullRequestSummary
+import dev.azure.desktop.domain.release.ReleaseSummary
 import dev.azure.desktop.login.LoginStateMachine
 import dev.azure.desktop.navigation.AppScreen
 import dev.azure.desktop.pr.detail.PrDetailState
@@ -23,12 +25,16 @@ import dev.azure.desktop.pr.detail.PrDetailAction
 import dev.azure.desktop.pr.detail.PrDetailStateMachine
 import dev.azure.desktop.pr.review.CodeReviewStateMachine
 import dev.azure.desktop.pr.list.PrListStateMachine
+import dev.azure.desktop.release.detail.ReleaseDetailStateMachine
+import dev.azure.desktop.release.list.ReleaseListStateMachine
 import dev.azure.desktop.theme.EditorialTheme
 import dev.azure.desktop.ui.screens.CodeReviewScreen
 import dev.azure.desktop.ui.screens.DesignSystemScreen
 import dev.azure.desktop.ui.screens.LoginScreen
 import dev.azure.desktop.ui.screens.PrListScreen
 import dev.azure.desktop.ui.screens.PrOverviewScreen
+import dev.azure.desktop.ui.screens.ReleaseDetailScreen
+import dev.azure.desktop.ui.screens.ReleaseListScreen
 import dev.azure.desktop.ui.shell.MainShell
 import javax.swing.SwingUtilities
 import kotlinx.coroutines.launch
@@ -46,6 +52,7 @@ fun App() {
             mutableStateOf(if (hasStoredSession) AppScreen.PrList else AppScreen.Login)
         }
         var selectedPullRequest by remember { mutableStateOf<PullRequestSummary?>(null) }
+        var selectedRelease by remember { mutableStateOf<ReleaseSummary?>(null) }
         var loginMachineEpoch by remember { mutableStateOf(0) }
         val loginStateMachine = remember(loginMachineEpoch) {
             LoginStateMachine(JvmAuthServices.verifyAndStorePat)
@@ -90,6 +97,28 @@ fun App() {
                 )
             }
         }
+        val releaseListStateMachine = remember(organization, loginMachineEpoch) {
+            if (organization.isNotBlank()) {
+                ReleaseListStateMachine(
+                    organization = organization,
+                    listProjectsUseCase = JvmPullRequestServices.listProjectsUseCase,
+                    listReleaseDefinitionsUseCase = JvmReleaseServices.listReleaseDefinitionsUseCase,
+                    listReleasesForDefinitionUseCase = JvmReleaseServices.listReleasesForDefinitionUseCase,
+                )
+            } else {
+                null
+            }
+        }
+        val releaseDetailStateMachine = remember(selectedRelease, organization, loginMachineEpoch) {
+            selectedRelease?.let { rel ->
+                ReleaseDetailStateMachine(
+                    organization = organization,
+                    projectName = rel.projectName,
+                    releaseId = rel.id,
+                    getReleaseDetailUseCase = JvmReleaseServices.getReleaseDetailUseCase,
+                )
+            }
+        }
 
         val authActions = remember { object { lateinit var onSessionExpiredFromHttp: () -> Unit } }
         authActions.onSessionExpiredFromHttp = {
@@ -97,6 +126,7 @@ fun App() {
             loginMachineEpoch++
             screen.value = AppScreen.Login
             selectedPullRequest = null
+            selectedRelease = null
             organization = JvmAuthServices.patStorage.loadOrganization().orEmpty()
         }
 
@@ -112,6 +142,7 @@ fun App() {
             loginMachineEpoch++
             screen.value = AppScreen.Login
             selectedPullRequest = null
+            selectedRelease = null
             organization = ""
         }
 
@@ -169,15 +200,22 @@ fun App() {
 
                                 is PrDetailState.Error -> Text(current.message)
 
-                                is PrDetailState.Content ->
-                                    PrOverviewScreen(
-                                        detail = current.detail,
-                                        isVoting = current.isVoting,
-                                        voteErrorMessage = current.voteErrorMessage,
-                                        onApprove = { scope.launch { detailMachine.dispatch(PrDetailAction.Approve) } },
-                                        onReject = { scope.launch { detailMachine.dispatch(PrDetailAction.Reject) } },
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
+                                is PrDetailState.Content -> {
+                                    val reviewMachine = codeReviewStateMachine
+                                    if (reviewMachine == null) {
+                                        Text("Unable to open pull request.")
+                                    } else {
+                                        PrOverviewScreen(
+                                            detail = current.detail,
+                                            codeReviewStateMachine = reviewMachine,
+                                            isVoting = current.isVoting,
+                                            voteErrorMessage = current.voteErrorMessage,
+                                            onApprove = { scope.launch { detailMachine.dispatch(PrDetailAction.Approve) } },
+                                            onReject = { scope.launch { detailMachine.dispatch(PrDetailAction.Reject) } },
+                                            modifier = Modifier.fillMaxSize(),
+                                        )
+                                    }
+                                }
                             }
                         }
                     },
@@ -195,6 +233,50 @@ fun App() {
                         } else {
                             CodeReviewScreen(
                                 stateMachine = machine,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                    },
+                )
+
+            AppScreen.ReleaseList ->
+                MainShell(
+                    screen = AppScreen.ReleaseList,
+                    onNavigate = { screen.value = it },
+                    onSignOut = signOut,
+                    content = {
+                        val machine = releaseListStateMachine
+                        if (machine == null) {
+                            Text("Sign in to view releases.")
+                        } else {
+                            ReleaseListScreen(
+                                stateMachine = machine,
+                                onOpenRelease = {
+                                    selectedRelease = it
+                                    screen.value = AppScreen.ReleaseDetail
+                                },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                    },
+                )
+
+            AppScreen.ReleaseDetail ->
+                MainShell(
+                    screen = AppScreen.ReleaseDetail,
+                    onNavigate = { screen.value = it },
+                    onSignOut = signOut,
+                    content = {
+                        val machine = releaseDetailStateMachine
+                        if (machine == null) {
+                            screen.value = AppScreen.ReleaseList
+                        } else {
+                            ReleaseDetailScreen(
+                                stateMachine = machine,
+                                onBack = {
+                                    selectedRelease = null
+                                    screen.value = AppScreen.ReleaseList
+                                },
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }

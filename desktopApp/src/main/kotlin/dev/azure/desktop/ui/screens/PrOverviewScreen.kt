@@ -27,16 +27,24 @@ import androidx.compose.material.icons.outlined.Pending
 import androidx.compose.material.icons.outlined.Task
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
-import androidx.compose.material3.Button
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +58,7 @@ import dev.azure.desktop.domain.pr.PullRequestCheckStatus
 import dev.azure.desktop.domain.pr.PullRequestLinkedWorkItem
 import dev.azure.desktop.domain.pr.PullRequestReviewer
 import dev.azure.desktop.domain.pr.PullRequestTimelineItem
+import dev.azure.desktop.pr.review.CodeReviewStateMachine
 import dev.azure.desktop.theme.EditorialColors
 import java.time.Duration
 import java.time.Instant
@@ -57,6 +66,7 @@ import java.time.Instant
 @Composable
 fun PrOverviewScreen(
     detail: PullRequestDetail,
+    codeReviewStateMachine: CodeReviewStateMachine,
     isVoting: Boolean,
     voteErrorMessage: String?,
     onApprove: () -> Unit,
@@ -64,115 +74,158 @@ fun PrOverviewScreen(
     modifier: Modifier = Modifier,
 ) {
     val summary = detail.summary
+    var selectedTab by remember { mutableIntStateOf(0) }
     Box(modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(EditorialColors.surfaceContainerLow)
-                .verticalScroll(rememberScrollState())
-                .padding(32.dp),
+                .background(EditorialColors.surfaceContainerLow),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Surface(
-                    color = EditorialColors.primaryFixed,
-                    shape = RoundedCornerShape(999.dp),
-                ) {
-                    Text(
-                        "ACTIVE",
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = EditorialColors.onPrimaryFixed,
-                        fontSize = 10.sp,
-                    )
-                }
-                Text("PR #${summary.id}", style = MaterialTheme.typography.bodySmall, color = EditorialColors.outline, fontWeight = FontWeight.Medium)
-            }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                summary.title,
-                style = MaterialTheme.typography.headlineSmall.copy(fontSize = 28.sp, fontWeight = FontWeight.ExtraBold),
-                color = EditorialColors.onSurface,
-            )
-            Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clip(CircleShape)
-                        .background(EditorialColors.primaryContainer),
-                )
-                Text(summary.creatorDisplayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                Text(
-                    "wants to merge into ${summary.targetRefName.substringAfterLast("/")}" +
-                        " from ${summary.sourceRefName.substringAfterLast("/")}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = EditorialColors.onSurfaceVariant,
-                )
-            }
-            Spacer(Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(
-                        onClick = onReject,
-                        enabled = !isVoting,
+            Column(Modifier.padding(32.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Surface(
+                        color = EditorialColors.primaryFixed,
+                        shape = RoundedCornerShape(999.dp),
                     ) {
-                        Text("Reject")
+                        Text(
+                            "ACTIVE",
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = EditorialColors.onPrimaryFixed,
+                            fontSize = 10.sp,
+                        )
                     }
-                    Button(
-                        onClick = onApprove,
-                        enabled = !isVoting,
-                    ) {
-                        Text("Approve")
-                    }
+                    Text("PR #${summary.id}", style = MaterialTheme.typography.bodySmall, color = EditorialColors.outline, fontWeight = FontWeight.Medium)
                 }
-            }
-            if (!voteErrorMessage.isNullOrBlank()) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    voteErrorMessage,
-                    color = EditorialColors.error,
-                    style = MaterialTheme.typography.bodySmall,
+                    summary.title,
+                    style = MaterialTheme.typography.headlineSmall.copy(fontSize = 28.sp, fontWeight = FontWeight.ExtraBold),
+                    color = EditorialColors.onSurface,
                 )
-            }
-            Spacer(Modifier.height(28.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
-            ) {
-                Column(Modifier.weight(2f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                    Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = EditorialColors.surfaceContainerLowest),
-                        elevation = CardDefaults.cardElevation(2.dp),
-                    ) {
-                        Column(Modifier.padding(24.dp)) {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("DESCRIPTION", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                                TextButton(onClick = { }) { Text("Edit", color = EditorialColors.primary, fontWeight = FontWeight.SemiBold) }
-                            }
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                detail.description?.takeIf { it.isNotBlank() } ?: "No description was provided.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = EditorialColors.onSurfaceVariant,
-                            )
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clip(CircleShape)
+                            .background(EditorialColors.primaryContainer),
+                    )
+                    Text(summary.creatorDisplayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "wants to merge into ${summary.targetRefName.substringAfterLast("/")}" +
+                            " from ${summary.sourceRefName.substringAfterLast("/")}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = EditorialColors.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(
+                            onClick = onReject,
+                            enabled = !isVoting,
+                        ) {
+                            Text("Reject")
+                        }
+                        Button(
+                            onClick = onApprove,
+                            enabled = !isVoting,
+                        ) {
+                            Text("Approve")
                         }
                     }
-                    ActivityTimeline(detail.timeline)
                 }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                    ReviewersCard(detail.reviewers)
-                    LinkedItemsCard(
-                        linkedWorkItems = detail.linkedWorkItems,
-                        checks = detail.checks,
+                if (!voteErrorMessage.isNullOrBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        voteErrorMessage,
+                        color = EditorialColors.error,
+                        style = MaterialTheme.typography.bodySmall,
                     )
-                    StatsCard(linesAdded = detail.linesAdded, linesRemoved = detail.linesRemoved)
                 }
             }
-            Spacer(Modifier.height(80.dp))
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = EditorialColors.surfaceContainerLow,
+                modifier = Modifier.padding(horizontal = 32.dp),
+                indicator = { tabPositions ->
+                    TabRowDefaults.SecondaryIndicator(
+                        Modifier.tabIndicatorOffset(tabPositions[selectedTab]).height(2.dp),
+                        color = EditorialColors.primary,
+                    )
+                },
+                divider = { },
+            ) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = { Text("Overview", fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium) },
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = { Text("Files", fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium) },
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            when (selectedTab) {
+                0 ->
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 32.dp)
+                            .padding(bottom = 32.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(24.dp),
+                        ) {
+                            Column(Modifier.weight(2f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                                Card(
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(containerColor = EditorialColors.surfaceContainerLowest),
+                                    elevation = CardDefaults.cardElevation(2.dp),
+                                ) {
+                                    Column(Modifier.padding(24.dp)) {
+                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text("DESCRIPTION", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                                            TextButton(onClick = { }) { Text("Edit", color = EditorialColors.primary, fontWeight = FontWeight.SemiBold) }
+                                        }
+                                        Spacer(Modifier.height(8.dp))
+                                        Text(
+                                            detail.description?.takeIf { it.isNotBlank() } ?: "No description was provided.",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = EditorialColors.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                                ActivityTimeline(detail.timeline)
+                            }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                                ReviewersCard(detail.reviewers)
+                                LinkedItemsCard(
+                                    linkedWorkItems = detail.linkedWorkItems,
+                                    checks = detail.checks,
+                                )
+                                StatsCard(linesAdded = detail.linesAdded, linesRemoved = detail.linesRemoved)
+                            }
+                        }
+                        Spacer(Modifier.height(80.dp))
+                    }
+                1 ->
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                        CodeReviewScreen(
+                            stateMachine = codeReviewStateMachine,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+            }
         }
     }
 }

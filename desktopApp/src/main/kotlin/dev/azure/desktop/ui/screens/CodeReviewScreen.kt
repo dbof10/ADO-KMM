@@ -1,8 +1,10 @@
 package dev.azure.desktop.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -39,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -47,6 +50,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.snipme.highlights.Highlights
@@ -92,25 +97,61 @@ fun CodeReviewScreen(
     androidx.compose.runtime.LaunchedEffect(stateMachine) { stateMachine.state.collect { state = it } }
     val scope = rememberCoroutineScope()
     var viewMode by remember { mutableStateOf(DiffViewMode.SideBySide) }
+    var treePaneWidth by remember { mutableStateOf(260f) }
 
-    Row(modifier.fillMaxSize()) {
-        ChangesTreePane(
-            state = state,
-            onSelectPath = { path ->
-                scope.launch { stateMachine.dispatch(CodeReviewAction.SelectFile(path)) }
-            },
-            modifier = Modifier.width(260.dp).fillMaxHeight(),
-        )
-        Column(Modifier.weight(1f).fillMaxHeight()) {
-            DiffToolbar(
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val minTreePaneWidth = 180.dp.value
+        val maxTreePaneWidth = maxOf(minTreePaneWidth, maxWidth.value - 320.dp.value)
+        val clampedTreePaneWidth = treePaneWidth.coerceIn(minTreePaneWidth, maxTreePaneWidth)
+        if (treePaneWidth != clampedTreePaneWidth) {
+            treePaneWidth = clampedTreePaneWidth
+        }
+
+        Row(Modifier.fillMaxSize()) {
+            ChangesTreePane(
                 state = state,
-                viewMode = viewMode,
-                onSelectViewMode = { viewMode = it },
+                onSelectPath = { path ->
+                    scope.launch { stateMachine.dispatch(CodeReviewAction.SelectFile(path)) }
+                },
+                modifier = Modifier.width(clampedTreePaneWidth.dp).fillMaxHeight(),
             )
-            DiffBody(state, Modifier.weight(1f), viewMode = viewMode)
-            DiffFooter(state)
+            VerticalDragHandle(
+                onDragDelta = { dragAmount ->
+                    treePaneWidth = (treePaneWidth + dragAmount).coerceIn(minTreePaneWidth, maxTreePaneWidth)
+                },
+            )
+            Column(Modifier.weight(1f).fillMaxHeight()) {
+                DiffToolbar(
+                    state = state,
+                    viewMode = viewMode,
+                    onSelectViewMode = { viewMode = it },
+                )
+                DiffBody(state, Modifier.weight(1f), viewMode = viewMode)
+                DiffFooter(state)
+            }
         }
     }
+}
+
+@Composable
+private fun VerticalDragHandle(
+    onDragDelta: (Float) -> Unit,
+    width: Dp = 6.dp,
+) {
+    val density = LocalDensity.current
+    Box(
+        Modifier
+            .width(width)
+            .fillMaxHeight()
+            .background(EditorialColors.surfaceContainerHigh)
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures { change, dragAmount ->
+                    change.consume()
+                    val dragAmountDp = with(density) { dragAmount.toDp().value }
+                    onDragDelta(dragAmountDp)
+                }
+            },
+    )
 }
 
 @Composable
@@ -236,6 +277,8 @@ private fun DiffBody(
                 val lang = remember(state.selectedPath) { syntaxLangForPath(state.selectedPath) }
                 if (state.selectedPath == null) {
                     DiffLine("", EditorialColors.outline, AnnotatedString("Select a file to view its diff."), null, null)
+                } else if (state.isDiffLoading) {
+                    DiffLine("", EditorialColors.outline, AnnotatedString("Loading diff…"), null, null)
                 } else if (state.diffLines.isEmpty()) {
                     DiffLine("", EditorialColors.outline, AnnotatedString("No diff to display."), null, null)
                 } else {
@@ -521,9 +564,13 @@ private fun DiffFooter(state: CodeReviewState) {
             CodeReviewState.Loading -> 0 to 0
             is CodeReviewState.Error -> 0 to 0
             is CodeReviewState.Content -> {
-                val a = state.diffLines.count { it is PullRequestDiffLine.Added }
-                val r = state.diffLines.count { it is PullRequestDiffLine.Removed }
-                a to r
+                if (state.isDiffLoading) {
+                    0 to 0
+                } else {
+                    val a = state.diffLines.count { it is PullRequestDiffLine.Added }
+                    val r = state.diffLines.count { it is PullRequestDiffLine.Removed }
+                    a to r
+                }
             }
         }
     val branchLabel =

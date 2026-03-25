@@ -37,10 +37,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.azure.desktop.domain.pr.PullRequestChange
@@ -160,7 +163,6 @@ fun ChangesTreePane(
                                         indent = item.depth.coerceAtMost(8),
                                         selected = selected,
                                         struck = struck,
-                                        leading = { FauxCheckbox(checked = true) },
                                         onClick = { onSelectPath(node.fullPath) },
                                     )
                                 }
@@ -210,7 +212,6 @@ private fun FileRow(
     indent: Int,
     selected: Boolean,
     struck: Boolean = false,
-    leading: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)?,
 ) {
     val bg = if (selected) EditorialColors.surfaceContainerHighest else EditorialColors.surfaceContainerLow
@@ -230,33 +231,12 @@ private fun FileRow(
         } else {
             Spacer(Modifier.width(18.dp))
         }
-        if (leading != null) {
-            leading()
-        }
         Icon(icon, null, tint = if (selected) EditorialColors.primary else EditorialColors.outline, modifier = Modifier.size(20.dp))
         FileNameLabel(
             label = label,
             modifier = Modifier.weight(1f),
             struck = struck,
         )
-    }
-}
-
-@Composable
-private fun FauxCheckbox(checked: Boolean) {
-    val bg = if (checked) EditorialColors.primary else EditorialColors.surfaceContainerHigh
-    val fg = if (checked) EditorialColors.onPrimary else EditorialColors.outline
-    Box(
-        modifier =
-            Modifier
-                .size(14.dp)
-                .clip(RoundedCornerShape(3.dp))
-                .background(bg),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (checked) {
-            Text("✓", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = fg)
-        }
     }
 }
 
@@ -334,31 +314,26 @@ private fun FileNameLabel(
     val base = if (hasExtension) label.substring(0, dot) else label
     val ext = if (hasExtension) label.substring(dot) else ""
 
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(0.dp),
-    ) {
-        Text(
-            base,
-            style = MaterialTheme.typography.bodySmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            softWrap = false,
-            modifier = Modifier.weight(1f, fill = true),
-            textDecoration = if (struck) TextDecoration.LineThrough else TextDecoration.None,
-        )
-        if (ext.isNotBlank()) {
-            Text(
-                ext,
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
-                softWrap = false,
-                color = EditorialColors.outline,
-                textDecoration = if (struck) TextDecoration.LineThrough else TextDecoration.None,
-            )
+    val textDecoration = if (struck) TextDecoration.LineThrough else TextDecoration.None
+    val styledLabel =
+        buildAnnotatedString {
+            append(base)
+            if (ext.isNotBlank()) {
+                withStyle(SpanStyle(color = EditorialColors.outline)) {
+                    append(ext)
+                }
+            }
         }
-    }
+
+    Text(
+        text = styledLabel,
+        modifier = modifier,
+        style = MaterialTheme.typography.bodySmall,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        softWrap = false,
+        textDecoration = textDecoration,
+    )
 }
 
 private sealed interface PathNode {

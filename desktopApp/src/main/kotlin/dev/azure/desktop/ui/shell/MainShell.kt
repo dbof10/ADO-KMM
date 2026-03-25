@@ -21,7 +21,9 @@ internal fun MainShell(
     val tab: MainTab? = when (screen) {
         AppScreen.PrList -> MainTab.Overview
         AppScreen.PrDetail -> MainTab.Overview
-        AppScreen.CodeReview -> MainTab.Files
+        AppScreen.CodeReview -> null
+        AppScreen.ReleaseList -> MainTab.Releases
+        AppScreen.ReleaseDetail -> MainTab.Releases
         AppScreen.DesignSystem -> null
         AppScreen.Login -> null
     }
@@ -29,6 +31,8 @@ internal fun MainShell(
         AppScreen.PrList -> TopNavSection.PullRequests
         AppScreen.PrDetail -> TopNavSection.PullRequests
         AppScreen.CodeReview -> TopNavSection.Repositories
+        AppScreen.ReleaseList -> TopNavSection.Pipelines
+        AppScreen.ReleaseDetail -> TopNavSection.Pipelines
         AppScreen.DesignSystem -> TopNavSection.PullRequests
         AppScreen.Login -> TopNavSection.PullRequests
     }
@@ -38,7 +42,7 @@ internal fun MainShell(
         SideRail(
             selected = tab,
             onOverview = { onNavigate(AppScreen.PrList) },
-            onFiles = { onNavigate(AppScreen.CodeReview) },
+            onReleases = { onNavigate(AppScreen.ReleaseList) },
             onSettings = { onNavigate(AppScreen.DesignSystem) },
             onSignOut = onSignOut,
         )
@@ -50,7 +54,7 @@ internal fun MainShell(
                     when (section) {
                         TopNavSection.PullRequests -> onNavigate(AppScreen.PrList)
                         TopNavSection.Repositories -> onNavigate(AppScreen.CodeReview)
-                        TopNavSection.Pipelines -> { }
+                        TopNavSection.Pipelines -> onNavigate(AppScreen.ReleaseList)
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),

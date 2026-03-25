@@ -17,8 +17,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Architecture
 import androidx.compose.material.icons.outlined.Dashboard
-import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.HelpOutline
+import androidx.compose.material.icons.outlined.RocketLaunch
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Logout
 import androidx.compose.material.icons.outlined.Settings
@@ -39,7 +39,7 @@ private val RailWidth = 80.dp
 internal fun SideRail(
     selected: MainTab?,
     onOverview: () -> Unit,
-    onFiles: () -> Unit,
+    onReleases: () -> Unit,
     onSettings: () -> Unit,
     onSignOut: () -> Unit,
 ) {
@@ -70,10 +70,10 @@ internal fun SideRail(
                 onClick = onOverview,
             )
             RailIcon(
-                selected = selected == MainTab.Files,
-                icon = Icons.Outlined.Description,
-                contentDescription = "Files",
-                onClick = onFiles,
+                selected = selected == MainTab.Releases,
+                icon = Icons.Outlined.RocketLaunch,
+                contentDescription = "Releases",
+                onClick = onReleases,
             )
             RailIcon(
                 selected = false,
