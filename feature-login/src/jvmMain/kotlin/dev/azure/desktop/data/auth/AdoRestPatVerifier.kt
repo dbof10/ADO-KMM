@@ -12,6 +12,7 @@ import java.util.Base64
 
 private const val ConnectionDataPathSuffix = "/_apis/connectiondata"
 private const val ExpectedHost = "dev.azure.com"
+private const val ConnectionDataApiVersion = "7.0-preview.1"
 
 class AdoRestPatVerifier(
     private val httpClient: HttpClient,
@@ -24,7 +25,7 @@ class AdoRestPatVerifier(
 
             val token = Base64.getEncoder().encodeToString(":$pat".toByteArray(Charsets.UTF_8))
             val expectedPath = "/${org.encodeURLPathPart()}$ConnectionDataPathSuffix"
-            val url = "https://$ExpectedHost$expectedPath?api-version=7.0"
+            val url = "https://$ExpectedHost$expectedPath?api-version=$ConnectionDataApiVersion"
 
             val response = httpClient.get(url) {
                 headers.append(HttpHeaders.Authorization, "Basic $token")
@@ -32,9 +33,18 @@ class AdoRestPatVerifier(
             val body = response.bodyAsText()
             val mediaType = response.headers[HttpHeaders.ContentType].orEmpty()
             val isJsonResponse = mediaType.startsWith(ContentType.Application.Json.toString())
+            val finalPathSegments =
+                response.call.request.url.encodedPath
+                    .trim('/')
+                    .split('/')
+                    .filter { it.isNotBlank() }
+            val endedAtConnectionDataApi =
+                finalPathSegments.lastOrNull().equals("connectiondata", ignoreCase = true)
+            val actualOrg = finalPathSegments.firstOrNull().orEmpty()
             val endedAtExpectedApi =
                 response.call.request.url.host.equals(ExpectedHost, ignoreCase = true) &&
-                    response.call.request.url.encodedPath == expectedPath
+                    actualOrg.equals(org, ignoreCase = true) &&
+                    endedAtConnectionDataApi
             val accepted = response.status.isSuccess() && isJsonResponse && endedAtExpectedApi
 
             if (!accepted) {
