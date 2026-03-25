@@ -19,6 +19,7 @@ import dev.azure.desktop.login.LoginStateMachine
 import dev.azure.desktop.navigation.AppScreen
 import dev.azure.desktop.pr.detail.PrDetailState
 import dev.azure.desktop.pr.detail.PrDetailStateMachine
+import dev.azure.desktop.pr.review.CodeReviewStateMachine
 import dev.azure.desktop.pr.list.PrListStateMachine
 import dev.azure.desktop.theme.EditorialTheme
 import dev.azure.desktop.ui.screens.CodeReviewScreen
@@ -49,7 +50,9 @@ fun App() {
         val prListStateMachine = remember(organization, loginMachineEpoch) {
             PrListStateMachine(
                 organization = organization,
+                listProjectsUseCase = JvmPullRequestServices.listProjectsUseCase,
                 getMyPullRequestsUseCase = JvmPullRequestServices.getMyPullRequestsUseCase,
+                getActivePullRequestsUseCase = JvmPullRequestServices.getActivePullRequestsUseCase,
             )
         }
         val prDetailStateMachine = remember(selectedPullRequest, organization, loginMachineEpoch) {
@@ -58,6 +61,26 @@ fun App() {
                     organization = organization,
                     summary = it,
                     getPullRequestDetailUseCase = JvmPullRequestServices.getPullRequestDetailUseCase,
+                )
+            }
+        }
+        val codeReviewStateMachine = remember(selectedPullRequest, organization, loginMachineEpoch) {
+            selectedPullRequest?.let {
+                CodeReviewStateMachine(
+                    organization = organization,
+                    summary = it,
+                    getPullRequestDetailUseCase = JvmPullRequestServices.getPullRequestDetailUseCase,
+                    getPullRequestFileDiffUseCase = JvmPullRequestServices.getPullRequestFileDiffUseCase,
+                    getPullRequestChanges = { org, project, repo, prId, base, target ->
+                        JvmPullRequestServices.getPullRequestChanges(
+                            organization = org,
+                            projectName = project,
+                            repositoryId = repo,
+                            pullRequestId = prId,
+                            baseCommitId = base,
+                            targetCommitId = target,
+                        )
+                    },
                 )
             }
         }
@@ -155,7 +178,15 @@ fun App() {
                     onNavigate = { screen.value = it },
                     onSignOut = signOut,
                     content = {
-                        CodeReviewScreen(Modifier.fillMaxSize())
+                        val machine = codeReviewStateMachine
+                        if (machine == null) {
+                            Text("Select a pull request first.")
+                        } else {
+                            CodeReviewScreen(
+                                stateMachine = machine,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     },
                 )
 

@@ -1,6 +1,7 @@
 package dev.azure.desktop.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,8 +35,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,22 +50,45 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.azure.desktop.domain.pr.PullRequestChange
+import dev.azure.desktop.domain.pr.PullRequestDiffLine
+import dev.azure.desktop.pr.review.CodeReviewAction
+import dev.azure.desktop.pr.review.CodeReviewState
+import dev.azure.desktop.pr.review.CodeReviewStateMachine
 import dev.azure.desktop.theme.EditorialColors
+import kotlinx.coroutines.launch
 
 @Composable
-fun CodeReviewScreen(modifier: Modifier = Modifier) {
+fun CodeReviewScreen(
+    stateMachine: CodeReviewStateMachine,
+    modifier: Modifier = Modifier,
+) {
+    var state: CodeReviewState by remember(stateMachine) { mutableStateOf(CodeReviewState.Loading) }
+    LaunchedEffect(stateMachine) { stateMachine.state.collect { state = it } }
+    val scope = rememberCoroutineScope()
+
     Row(modifier.fillMaxSize()) {
-        FileExplorerPane(Modifier.width(260.dp).fillMaxHeight())
+        FileExplorerPane(
+            state = state,
+            onSelectPath = { path ->
+                scope.launch { stateMachine.dispatch(CodeReviewAction.SelectFile(path)) }
+            },
+            modifier = Modifier.width(260.dp).fillMaxHeight(),
+        )
         Column(Modifier.weight(1f).fillMaxHeight()) {
-            DiffToolbar()
-            DiffBody(Modifier.weight(1f))
-            DiffFooter()
+            DiffToolbar(state)
+            DiffBody(state, Modifier.weight(1f))
+            DiffFooter(state)
         }
     }
 }
 
 @Composable
-private fun FileExplorerPane(modifier: Modifier) {
+private fun FileExplorerPane(
+    state: CodeReviewState,
+    onSelectPath: (String) -> Unit,
+    modifier: Modifier,
+) {
     Column(
         modifier
             .background(EditorialColors.surfaceContainerLow),
@@ -82,12 +110,36 @@ private fun FileExplorerPane(modifier: Modifier) {
                 .padding(horizontal = 10.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            FileRow(Icons.Outlined.FolderOpen, "src/components", indent = 0, selected = false, dotColor = null)
-            FileRow(Icons.Outlined.Description, "DiffViewer.tsx", indent = 1, selected = true, dotColor = EditorialColors.tertiaryContainer)
-            FileRow(Icons.Outlined.Description, "StatusBadge.tsx", indent = 1, selected = false, dotColor = EditorialColors.primary)
-            FileRow(Icons.Outlined.Description, "LegacyLoader.js", indent = 1, selected = false, dotColor = EditorialColors.error, struck = true)
-            FileRow(Icons.Outlined.Folder, "styles", indent = 0, selected = false, dotColor = null)
-            FileRow(Icons.Outlined.Description, "globals.css", indent = 1, selected = false, dotColor = null)
+            when (state) {
+                CodeReviewState.Loading -> {
+                    FileRow(Icons.Outlined.FolderOpen, "Loading…", indent = 0, selected = false, dotColor = null, onClick = null)
+                }
+
+                is CodeReviewState.Error -> {
+                    FileRow(Icons.Outlined.FolderOpen, "Failed to load", indent = 0, selected = false, dotColor = EditorialColors.error, onClick = null)
+                    FileRow(Icons.Outlined.Description, state.message, indent = 1, selected = false, dotColor = null, onClick = null)
+                }
+
+                is CodeReviewState.Content -> {
+                    if (state.changes.isEmpty()) {
+                        FileRow(Icons.Outlined.FolderOpen, "No changes", indent = 0, selected = false, dotColor = null, onClick = null)
+                    } else {
+                        state.changes.forEach { change ->
+                            val selected = change.path == state.selectedPath
+                            val (dot, struck) = changeDotAndStrike(change)
+                            FileRow(
+                                icon = if (change.path.count { it == '/' } == 1) Icons.Outlined.Folder else Icons.Outlined.Description,
+                                label = change.path.trimStart('/'),
+                                indent = change.path.trimStart('/').count { it == '/' }.coerceAtMost(6),
+                                selected = selected,
+                                dotColor = dot,
+                                struck = struck,
+                                onClick = { onSelectPath(change.path) },
+                            )
+                        }
+                    }
+                }
+            }
         }
         Surface(color = EditorialColors.surfaceContainerHigh) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -101,8 +153,14 @@ private fun FileExplorerPane(modifier: Modifier) {
                     Text("JS", color = EditorialColors.onPrimaryFixed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
                 Column {
-                    Text("PR #1204", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                    Text("Architectural Ledger Refactor", fontSize = 10.sp, color = EditorialColors.outline, fontStyle = FontStyle.Italic)
+                    val (idLabel, titleLabel) =
+                        when (state) {
+                            CodeReviewState.Loading -> "PR" to "Loading…"
+                            is CodeReviewState.Error -> "PR" to "—"
+                            is CodeReviewState.Content -> "PR #${state.pullRequest.id}" to state.pullRequest.title
+                        }
+                    Text(idLabel, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                    Text(titleLabel, fontSize = 10.sp, color = EditorialColors.outline, fontStyle = FontStyle.Italic, maxLines = 1)
                 }
             }
         }
@@ -117,6 +175,7 @@ private fun FileRow(
     selected: Boolean,
     dotColor: androidx.compose.ui.graphics.Color?,
     struck: Boolean = false,
+    onClick: (() -> Unit)?,
 ) {
     val bg = if (selected) EditorialColors.surfaceContainerHighest else EditorialColors.surfaceContainerLow
     Row(
@@ -124,6 +183,7 @@ private fun FileRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .background(bg)
+            .let { base -> if (onClick != null) base.clickable { onClick() } else base }
             .padding(horizontal = (8 + indent * 12).dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -143,7 +203,20 @@ private fun FileRow(
 }
 
 @Composable
-private fun DiffToolbar() {
+private fun DiffToolbar(state: CodeReviewState) {
+    val selected =
+        when (state) {
+            CodeReviewState.Loading -> null
+            is CodeReviewState.Error -> null
+            is CodeReviewState.Content -> state.selectedPath
+        }
+    val selectedChangeType =
+        (state as? CodeReviewState.Content)
+            ?.changes
+            ?.firstOrNull { it.path == selected }
+            ?.changeType
+            .orEmpty()
+
     Row(
         Modifier
             .fillMaxWidth()
@@ -154,15 +227,34 @@ private fun DiffToolbar() {
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("src/components /", color = EditorialColors.outline, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-            Text("DiffViewer.tsx", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-            Surface(shape = RoundedCornerShape(999.dp), color = EditorialColors.tertiaryFixed) {
+            val label = selected?.trimStart('/') ?: "Select a file"
+            val folder = label.substringBeforeLast("/", missingDelimiterValue = "")
+            if (folder.isNotBlank()) {
+                Text("$folder /", color = EditorialColors.outline, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+            }
+            Text(label.substringAfterLast("/"), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+            val badgeText = selectedChangeType.ifBlank { "—" }.uppercase()
+            val badgeColor =
+                when (selectedChangeType.lowercase()) {
+                    "add" -> EditorialColors.primaryFixed
+                    "delete" -> EditorialColors.errorContainer
+                    "edit", "modify" -> EditorialColors.tertiaryFixed
+                    else -> EditorialColors.surfaceContainerHigh
+                }
+            val badgeTextColor =
+                when (selectedChangeType.lowercase()) {
+                    "add" -> EditorialColors.onPrimaryFixed
+                    "delete" -> EditorialColors.onErrorContainer
+                    "edit", "modify" -> EditorialColors.onTertiaryFixed
+                    else -> EditorialColors.outline
+                }
+            Surface(shape = RoundedCornerShape(999.dp), color = badgeColor) {
                 Text(
-                    "MODIFIED",
+                    badgeText,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    color = EditorialColors.onTertiaryFixed,
+                    color = badgeTextColor,
                 )
             }
         }
@@ -186,7 +278,7 @@ private fun DiffToolbar() {
 }
 
 @Composable
-private fun DiffBody(modifier: Modifier) {
+private fun DiffBody(state: CodeReviewState, modifier: Modifier) {
     val scroll = rememberScrollState()
     Column(
         modifier
@@ -195,16 +287,34 @@ private fun DiffBody(modifier: Modifier) {
             .verticalScroll(scroll)
             .padding(bottom = 8.dp),
     ) {
-        DiffLine("142", EditorialColors.onSurfaceVariant, "    const [isOpen, setIsOpen] = useState(false);", null, null)
-        DiffLine("143", EditorialColors.onErrorContainer, " -  const toggle = () => setIsOpen(!isOpen);", EditorialColors.errorContainer.copy(alpha = 0.2f), EditorialColors.error)
-        DiffLine("143", EditorialColors.onPrimaryFixedVariant, " +  const toggle = useCallback(() => setIsOpen(prev => !prev), []);", EditorialColors.primaryFixed.copy(alpha = 0.2f), EditorialColors.primary)
-        DiffLine("144", EditorialColors.onSurfaceVariant, "", null, null)
-        CommentThreadCard()
-        DiffLine("145", EditorialColors.onSurfaceVariant, "    useEffect(() => {", null, null)
-        DiffLine("146", EditorialColors.onSurfaceVariant, "        if (isOpen) {", null, null)
-        DiffLine("147", EditorialColors.onSurfaceVariant, "            document.body.style.overflow = 'hidden';", null, null)
-        DiffLine("148", EditorialColors.onSurfaceVariant, "        }", null, null)
-        DiffLine("149", EditorialColors.onSurfaceVariant, "    }, [isOpen]);", null, null)
+        when (state) {
+            CodeReviewState.Loading -> {
+                DiffLine("", EditorialColors.outline, "Loading diff…", null, null)
+            }
+
+            is CodeReviewState.Error -> {
+                DiffLine("", EditorialColors.onErrorContainer, state.message, EditorialColors.errorContainer.copy(alpha = 0.2f), EditorialColors.error)
+            }
+
+            is CodeReviewState.Content -> {
+                if (state.selectedPath == null) {
+                    DiffLine("", EditorialColors.outline, "Select a file to view its diff.", null, null)
+                } else if (state.diffLines.isEmpty()) {
+                    DiffLine("", EditorialColors.outline, "No diff to display.", null, null)
+                } else {
+                    state.diffLines.forEach { line ->
+                        val render = renderDiffLine(line)
+                        DiffLine(
+                            num = render.number,
+                            textColor = render.textColor,
+                            body = render.body,
+                            rowBg = render.rowBg,
+                            accent = render.accent,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -309,7 +419,17 @@ private fun CommentThreadCard() {
 }
 
 @Composable
-private fun DiffFooter() {
+private fun DiffFooter(state: CodeReviewState) {
+    val (added, removed) =
+        when (state) {
+            CodeReviewState.Loading -> 0 to 0
+            is CodeReviewState.Error -> 0 to 0
+            is CodeReviewState.Content -> {
+                val a = state.diffLines.count { it is PullRequestDiffLine.Added }
+                val r = state.diffLines.count { it is PullRequestDiffLine.Removed }
+                a to r
+            }
+        }
     Row(
         Modifier
             .fillMaxWidth()
@@ -334,8 +454,54 @@ private fun DiffFooter() {
             Text("TypeScript JSX", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = EditorialColors.outline)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(Modifier.size(8.dp).clip(CircleShape).background(EditorialColors.primary))
-                Text("+42 -12", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = EditorialColors.outline)
+                Text("+$added -$removed", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = EditorialColors.outline)
             }
         }
     }
 }
+
+private data class DiffRender(
+    val number: String,
+    val body: String,
+    val textColor: androidx.compose.ui.graphics.Color,
+    val rowBg: androidx.compose.ui.graphics.Color?,
+    val accent: androidx.compose.ui.graphics.Color?,
+)
+
+private fun renderDiffLine(line: PullRequestDiffLine): DiffRender =
+    when (line) {
+        is PullRequestDiffLine.Context ->
+            DiffRender(
+                number = (line.newLineNumber ?: line.oldLineNumber)?.toString().orEmpty(),
+                body = "    ${line.text}",
+                textColor = EditorialColors.onSurfaceVariant,
+                rowBg = null,
+                accent = null,
+            )
+
+        is PullRequestDiffLine.Removed ->
+            DiffRender(
+                number = line.oldLineNumber?.toString().orEmpty(),
+                body = " -  ${line.text}",
+                textColor = EditorialColors.onErrorContainer,
+                rowBg = EditorialColors.errorContainer.copy(alpha = 0.2f),
+                accent = EditorialColors.error,
+            )
+
+        is PullRequestDiffLine.Added ->
+            DiffRender(
+                number = line.newLineNumber?.toString().orEmpty(),
+                body = " +  ${line.text}",
+                textColor = EditorialColors.onPrimaryFixedVariant,
+                rowBg = EditorialColors.primaryFixed.copy(alpha = 0.2f),
+                accent = EditorialColors.primary,
+            )
+    }
+
+private fun changeDotAndStrike(change: PullRequestChange): Pair<androidx.compose.ui.graphics.Color?, Boolean> =
+    when (change.changeType.lowercase()) {
+        "add" -> EditorialColors.primary to false
+        "delete" -> EditorialColors.error to true
+        "edit", "modify" -> EditorialColors.tertiaryContainer to false
+        else -> null to false
+    }

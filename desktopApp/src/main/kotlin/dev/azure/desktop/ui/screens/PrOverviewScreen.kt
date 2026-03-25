@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Pending
 import androidx.compose.material.icons.outlined.Task
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
@@ -38,12 +39,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.azure.desktop.domain.pr.PullRequestDetail
+import dev.azure.desktop.domain.pr.PullRequestCheckState
+import dev.azure.desktop.domain.pr.PullRequestCheckStatus
+import dev.azure.desktop.domain.pr.PullRequestLinkedWorkItem
 import dev.azure.desktop.domain.pr.PullRequestReviewer
+import dev.azure.desktop.domain.pr.PullRequestTimelineItem
 import dev.azure.desktop.theme.EditorialColors
+import java.time.Duration
+import java.time.Instant
 
 @Composable
 fun PrOverviewScreen(
@@ -120,12 +128,15 @@ fun PrOverviewScreen(
                             )
                         }
                     }
-                    ActivityTimeline()
+                    ActivityTimeline(detail.timeline)
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     ReviewersCard(detail.reviewers)
-                    LinkedItemsCard()
-                    StatsCard()
+                    LinkedItemsCard(
+                        linkedWorkItems = detail.linkedWorkItems,
+                        checks = detail.checks,
+                    )
+                    StatsCard(linesAdded = detail.linesAdded, linesRemoved = detail.linesRemoved)
                 }
             }
             Spacer(Modifier.height(80.dp))
@@ -144,34 +155,49 @@ fun PrOverviewScreen(
 }
 
 @Composable
-private fun ActivityTimeline() {
+private fun ActivityTimeline(items: List<PullRequestTimelineItem>) {
     Column {
         Text("ACTIVITY TIMELINE", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp))
         Spacer(Modifier.height(12.dp))
         Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            TimelineComment()
-            TimelineApproval()
-            TimelineCommit()
+            if (items.isEmpty()) {
+                Text(
+                    "No activity yet.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = EditorialColors.outline,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+            } else {
+                items.take(25).forEach { item ->
+                    when (item) {
+                        is PullRequestTimelineItem.Comment -> TimelineComment(item)
+                        is PullRequestTimelineItem.Approval -> TimelineApproval(item)
+                        is PullRequestTimelineItem.Commit -> TimelineCommit(item)
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun TimelineComment() {
+private fun TimelineComment(item: PullRequestTimelineItem.Comment) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Icon(Icons.Outlined.ModeComment, null, tint = EditorialColors.outline, modifier = Modifier.size(18.dp))
         Card(colors = CardDefaults.cardColors(containerColor = EditorialColors.surfaceContainerLowest), shape = RoundedCornerShape(12.dp)) {
             Column(Modifier.padding(16.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Sarah Miller", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                        Text("2 hours ago", style = MaterialTheme.typography.bodySmall, color = EditorialColors.outline)
+                        Text(item.actorDisplayName.ifBlank { "Unknown" }, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        relativeTimeLabel(item.createdDateIso)?.let { label ->
+                            Text(label, style = MaterialTheme.typography.bodySmall, color = EditorialColors.outline)
+                        }
                     }
                     Icon(Icons.Outlined.MoreHoriz, null, tint = EditorialColors.outline)
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "The retry logic on line 142 seems a bit aggressive for the database shard. Should we consider an exponential backoff instead?",
+                    item.content,
                     style = MaterialTheme.typography.bodySmall,
                     color = EditorialColors.onSurfaceVariant,
                 )
@@ -186,19 +212,21 @@ private fun TimelineComment() {
 }
 
 @Composable
-private fun TimelineApproval() {
+private fun TimelineApproval(item: PullRequestTimelineItem.Approval) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Filled.CheckCircle, null, tint = EditorialColors.primary, modifier = Modifier.size(20.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Alex Chen", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+            Text(item.actorDisplayName.ifBlank { "Unknown" }, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
             Text("approved these changes", style = MaterialTheme.typography.bodySmall, color = EditorialColors.onSurfaceVariant)
-            Text("1 hour ago", style = MaterialTheme.typography.bodySmall, color = EditorialColors.outline)
+            relativeTimeLabel(item.createdDateIso)?.let { label ->
+                Text(label, style = MaterialTheme.typography.bodySmall, color = EditorialColors.outline)
+            }
         }
     }
 }
 
 @Composable
-private fun TimelineCommit() {
+private fun TimelineCommit(item: PullRequestTimelineItem.Commit) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Icon(Icons.Outlined.Commit, null, tint = EditorialColors.outline, modifier = Modifier.size(18.dp))
         Surface(
@@ -208,12 +236,33 @@ private fun TimelineCommit() {
         ) {
             Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("8f2a10c", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = EditorialColors.primary)
-                    Text("chore: update Envoy proxy configuration schema", style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                    Text(item.commitId, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = EditorialColors.primary)
+                    Text(item.message, style = MaterialTheme.typography.bodySmall, maxLines = 1)
                 }
-                Text("45 mins ago", style = MaterialTheme.typography.bodySmall, color = EditorialColors.outline)
+                relativeTimeLabel(item.createdDateIso)?.let { label ->
+                    Text(label, style = MaterialTheme.typography.bodySmall, color = EditorialColors.outline)
+                }
             }
         }
+    }
+}
+
+private fun relativeTimeLabel(iso: String?): String? {
+    if (iso.isNullOrBlank()) return null
+    val instant = try {
+        Instant.parse(iso)
+    } catch (_: Throwable) {
+        return null
+    }
+    val now = Instant.now()
+    val duration = Duration.between(instant, now)
+    val seconds = duration.seconds
+    if (seconds < 0) return null
+    return when {
+        seconds < 60 -> "just now"
+        seconds < 60 * 60 -> "${seconds / 60} mins ago"
+        seconds < 60 * 60 * 24 -> "${seconds / (60 * 60)} hours ago"
+        else -> "${seconds / (60 * 60 * 24)} days ago"
     }
 }
 
@@ -224,28 +273,37 @@ private fun ReviewersCard(reviewers: List<PullRequestReviewer>) {
             Text("REVIEWERS", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
             reviewers.take(6).forEachIndexed { index, reviewer ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Box(Modifier.size(32.dp).clip(CircleShape).background(EditorialColors.surfaceContainerHigh))
-                        Column {
-                            Text(reviewer.displayName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                            Text(reviewer.uniqueName.orEmpty(), fontSize = 9.sp, color = EditorialColors.outline, fontWeight = FontWeight.Bold)
+                        Column(Modifier.fillMaxWidth()) {
+                            val readableName = reviewer.readableName()
+                            Text(
+                                readableName,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                reviewer.uniqueName.orEmpty(),
+                                fontSize = 9.sp,
+                                color = EditorialColors.outline,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            if (reviewer.vote >= 10) Icons.Filled.CheckCircle else Icons.Outlined.Schedule,
-                            null,
-                            tint = if (reviewer.vote >= 10) EditorialColors.primary else EditorialColors.outline,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Text(
-                            if (reviewer.vote >= 10) "Approved" else "Waiting",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (reviewer.vote >= 10) EditorialColors.primary else EditorialColors.outline,
-                        )
-                    }
+                    ReviewerStatusBadge(vote = reviewer.vote)
                 }
                 if (index != reviewers.lastIndex) Spacer(Modifier.height(12.dp))
             }
@@ -253,24 +311,115 @@ private fun ReviewersCard(reviewers: List<PullRequestReviewer>) {
     }
 }
 
+private fun PullRequestReviewer.readableName(): String {
+    val raw = displayName.ifBlank { uniqueName.orEmpty() }.trim()
+    if (raw.isBlank()) return "Unknown reviewer"
+
+    val slashSegment = raw.substringAfterLast("\\", raw)
+    val normalized = slashSegment
+        .replace('_', ' ')
+        .replace(Regex("\\s+"), " ")
+        .trim()
+
+    return normalized.ifBlank { raw }
+}
+
 @Composable
-private fun LinkedItemsCard() {
+private fun ReviewerStatusBadge(vote: Int) {
+    val approved = vote >= 10
+    val label = if (approved) "Approved" else "Waiting"
+    val tint = if (approved) EditorialColors.primary else EditorialColors.outline
+
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = (if (approved) EditorialColors.primary else EditorialColors.surfaceContainerHighest).copy(alpha = 0.12f),
+        contentColor = tint,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                if (approved) Icons.Filled.CheckCircle else Icons.Outlined.Schedule,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(16.dp),
+            )
+            Text(
+                label,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = tint,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LinkedItemsCard(
+    linkedWorkItems: List<PullRequestLinkedWorkItem>,
+    checks: List<PullRequestCheckStatus>,
+) {
     Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(EditorialColors.surfaceContainerLowest)) {
         Column {
             Column(Modifier.padding(20.dp)) {
                 Text("LINKED ITEMS", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(12.dp))
-                LinkedRow(Icons.Outlined.Task, EditorialColors.tertiary, "#2045: Service Mesh Latency", "User Story • In Progress")
-                LinkedRow(Icons.Outlined.BugReport, EditorialColors.error, "#1982: Cluster Discovery Race", "Bug • Fixed")
+                if (linkedWorkItems.isEmpty()) {
+                    Text(
+                        "No linked items.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = EditorialColors.outline,
+                    )
+                } else {
+                    linkedWorkItems.take(6).forEach { item ->
+                        val type = item.type.orEmpty()
+                        val isBug = type.equals("bug", ignoreCase = true)
+                        val icon = if (isBug) Icons.Outlined.BugReport else Icons.Outlined.Task
+                        val tint = if (isBug) EditorialColors.error else EditorialColors.tertiary
+                        val title = buildString {
+                            append("#${item.id}")
+                            item.title?.takeIf { it.isNotBlank() }?.let { append(": ").append(it) }
+                        }
+                        val subtitle = listOfNotNull(item.type?.takeIf { it.isNotBlank() }, item.state?.takeIf { it.isNotBlank() })
+                            .joinToString(" • ")
+                            .ifBlank { "Work Item" }
+                        LinkedRow(icon, tint, title, subtitle)
+                    }
+                }
             }
-            Column(Modifier.background(EditorialColors.surfaceContainerHighest.copy(alpha = 0.5f)).padding(20.dp)) {
+            Column(Modifier.padding(20.dp)) {
                 Text("CHECKS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = EditorialColors.outline)
                 Spacer(Modifier.height(8.dp))
-                CheckRow(Icons.Filled.CheckCircle, "Unit Tests", "PASSING")
-                CheckRow(Icons.Filled.CheckCircle, "Static Analysis", "PASSING")
-                CheckRow(Icons.Outlined.Pending, "Security Scan", "RUNNING")
+                if (checks.isEmpty()) {
+                    Text(
+                        "No checks.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = EditorialColors.outline,
+                    )
+                } else {
+                    checks.take(6).forEach { check ->
+                        val (icon, statusLabel, tint) = check.toUi()
+                        CheckRow(icon, check.name, statusLabel, tint)
+                    }
+                }
             }
         }
+    }
+}
+
+private fun PullRequestCheckStatus.toUi(): Triple<androidx.compose.ui.graphics.vector.ImageVector, String, androidx.compose.ui.graphics.Color> {
+    return when (state) {
+        PullRequestCheckState.Succeeded -> Triple(Icons.Filled.CheckCircle, "PASSING", EditorialColors.primary)
+        PullRequestCheckState.Failed -> Triple(Icons.Outlined.ErrorOutline, "FAILING", EditorialColors.error)
+        PullRequestCheckState.Running -> Triple(Icons.Outlined.Pending, "RUNNING", EditorialColors.outline)
+        PullRequestCheckState.Pending -> Triple(Icons.Outlined.Pending, "PENDING", EditorialColors.outline)
+        PullRequestCheckState.NotApplicable -> Triple(Icons.Outlined.Pending, "N/A", EditorialColors.outline)
+        PullRequestCheckState.Unknown -> Triple(Icons.Outlined.Pending, "UNKNOWN", EditorialColors.outline)
     }
 }
 
@@ -286,10 +435,15 @@ private fun LinkedRow(icon: androidx.compose.ui.graphics.vector.ImageVector, tin
 }
 
 @Composable
-private fun CheckRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, status: String) {
+private fun CheckRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    status: String,
+    tint: androidx.compose.ui.graphics.Color,
+) {
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = if (status == "RUNNING") EditorialColors.outline else EditorialColors.primary, modifier = Modifier.size(18.dp))
+            Icon(icon, null, tint = tint, modifier = Modifier.size(18.dp))
             Text(label, style = MaterialTheme.typography.bodySmall)
         }
         Text(status, fontSize = 10.sp, color = EditorialColors.outline, fontWeight = FontWeight.Medium)
@@ -297,11 +451,11 @@ private fun CheckRow(icon: androidx.compose.ui.graphics.vector.ImageVector, labe
 }
 
 @Composable
-private fun StatsCard() {
+private fun StatsCard(linesAdded: Int?, linesRemoved: Int?) {
     Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(EditorialColors.surfaceContainerLowest)) {
         Row(Modifier.padding(20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatCell(Modifier.weight(1f), "742", "ADDED")
-            StatCell(Modifier.weight(1f), "128", "REMOVED")
+            StatCell(Modifier.weight(1f), linesAdded?.toString() ?: "—", "ADDED")
+            StatCell(Modifier.weight(1f), linesRemoved?.toString() ?: "—", "REMOVED")
         }
     }
 }
