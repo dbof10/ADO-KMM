@@ -2,11 +2,21 @@
 kotlin = "2.1.10"
 compose = "1.8.0"
 ktor = "3.1.1"
+coroutines = "1.10.1"
+flowredux = "1.2.2"
+microsoft-credential-storage = "1.0.3"
+slf4j = "2.0.16"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "coroutines" }
+flowredux = { module = "com.freeletics.flowredux:flowredux", version.ref = "flowredux" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
+microsoft-credential-secure-storage = { module = "com.microsoft:credential-secure-storage", version.ref = "microsoft-credential-storage" }
+slf4j-nop = { module = "org.slf4j:slf4j-nop", version.ref = "slf4j" }
 
 [plugins]
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

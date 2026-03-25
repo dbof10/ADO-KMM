@@ -16,4 +16,4 @@ dependencyResolutionManagement {
     }
 }
 
-include(":shared", ":desktopApp")
+include(":common", ":feature-login", ":desktopApp")

@@ -1,0 +1,39 @@
+---
+description: Enforce FlowRedux and clean architecture for new features
+alwaysApply: true
+---
+
+# FlowRedux + Clean Architecture
+
+When implementing a new feature, use [FlowRedux](https://github.com/freeletics/FlowRedux) as the state machine pattern and organize code with clean architecture boundaries.
+
+## Required standards
+
+- Use a `FlowReduxStateMachine` (or project-specific wrapper) for feature state and action handling.
+- Keep layers separated: `presentation` -> `domain` -> `data` (dependencies point inward only).
+- Put business rules and use cases in `domain`; keep framework/UI details out of `domain`.
+- Keep infrastructure concerns (API, DB, storage, mappers) in `data`, exposed via domain interfaces.
+- In `presentation`, dispatch actions and observe state; do not embed business logic in UI.
+
+## Feature checklist
+
+- Define sealed state and action models for the feature state machine.
+- Add/extend use cases and repository interfaces in `domain`.
+- Implement repository/data sources and mapping in `data`.
+- Wire the state machine and use cases in `presentation` or DI modules.
+
+## Quick examples
+
+```kotlin
+// ✅ GOOD: presentation delegates business logic to use case
+on<RefreshAction> { _, state ->
+    val items = getItemsUseCase()
+    state.override { Content(items) }
+}
+
+// ❌ BAD: UI/presentation talks to API directly
+on<RefreshAction> { _, state ->
+    val items = api.fetchItems()
+    state.override { Content(items) }
+}
+```

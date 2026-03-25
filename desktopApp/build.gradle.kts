@@ -18,7 +18,10 @@ kotlin {
 }
 
 dependencies {
-    implementation(project(":shared"))
+    implementation(project(":common"))
+    implementation(project(":feature-login"))
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.swing)
     implementation(compose.desktop.currentOs)
     implementation(compose.runtime)
     implementation(compose.foundation)

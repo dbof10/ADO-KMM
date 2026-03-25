@@ -36,6 +36,7 @@ Repositories: **Google Maven** + **Maven Central** (required for Compose transit
 - Match existing **package** (`dev.azure.desktop`) and **Gradle** style.
 - Do **not** commit PATs, `.env` files with secrets, or tokens; prefer secure storage when implementing sign-in.
 - Prefer **`shared`** for anything that should stay testable and host-agnostic; keep **`desktopApp`** for UI and platform-specific desktop concerns.
+- When working in the **data layer**, design for **provider abstraction**: define domain-facing repository/contracts that are VCS-provider agnostic, implement **Azure DevOps** as the first adapter now, and keep extension points ready for future **GitLab/GitHub** adapters.
 
 ## References
 

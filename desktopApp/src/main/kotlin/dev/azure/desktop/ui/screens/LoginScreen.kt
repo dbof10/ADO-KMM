@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -33,12 +34,15 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -46,26 +50,45 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.azure.desktop.login.LoginMachineAction
+import dev.azure.desktop.login.LoginMachineState
+import dev.azure.desktop.login.LoginStateMachine
 import dev.azure.desktop.theme.EditorialColors
+import dev.azure.desktop.ui.components.LoginErrorView
+import kotlinx.coroutines.launch
 
 @Composable
-fun LoginScreen(onConnect: () -> Unit) {
+fun LoginScreen(
+    stateMachine: LoginStateMachine,
+    onLoggedIn: () -> Unit,
+) {
+    val organization = remember { mutableStateOf("") }
     val pat = remember { mutableStateOf("") }
     val scroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    var machineState by remember { mutableStateOf<LoginMachineState>(LoginMachineState.Idle(null)) }
+
+    LaunchedEffect(stateMachine) {
+        var previous: LoginMachineState? = null
+        stateMachine.state.collect { state ->
+            machineState = state
+            if (state is LoginMachineState.Success && previous !is LoginMachineState.Success) {
+                onLoggedIn()
+            }
+            previous = state
+        }
+    }
+
+    val idleError = (machineState as? LoginMachineState.Idle)?.error
+    val isWorking = machineState is LoginMachineState.Working
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(EditorialColors.surface),
-        contentAlignment = Alignment.Center,
+            .background(EditorialColors.surfaceContainerLow),
     ) {
         Row(
-            modifier = Modifier
-                .width(960.dp)
-                .height(560.dp)
-                .shadow(24.dp, RoundedCornerShape(16.dp))
-                .clip(RoundedCornerShape(16.dp))
-                .background(EditorialColors.surfaceContainerLow),
+            modifier = Modifier.fillMaxSize(),
         ) {
             Box(
                 modifier = Modifier
@@ -164,6 +187,24 @@ fun LoginScreen(onConnect: () -> Unit) {
                     color = EditorialColors.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(32.dp))
+                Text("Organization", style = MaterialTheme.typography.titleSmall, color = EditorialColors.onSurface)
+                Spacer(Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = organization.value,
+                    onValueChange = { organization.value = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("e.g. contoso") },
+                    keyboardOptions = KeyboardOptions.Default,
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = EditorialColors.surfaceContainerHighest,
+                        unfocusedContainerColor = EditorialColors.surfaceContainerHighest,
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                    ),
+                )
+                Spacer(Modifier.height(16.dp))
                 Text("Personal Access Token", style = MaterialTheme.typography.titleSmall, color = EditorialColors.onSurface)
                 Spacer(Modifier.height(6.dp))
                 OutlinedTextField(
@@ -183,6 +224,10 @@ fun LoginScreen(onConnect: () -> Unit) {
                         unfocusedBorderColor = Color.Transparent,
                     ),
                 )
+                idleError?.let { message ->
+                    Spacer(Modifier.height(8.dp))
+                    LoginErrorView(message = message)
+                }
                 Spacer(Modifier.height(24.dp))
                 Column(
                     modifier = Modifier
@@ -204,8 +249,18 @@ fun LoginScreen(onConnect: () -> Unit) {
                 }
                 Spacer(Modifier.height(28.dp))
                 Button(
-                    onClick = onConnect,
+                    onClick = {
+                        scope.launch {
+                            stateMachine.dispatch(
+                                LoginMachineAction.SubmitPat(
+                                    organization = organization.value,
+                                    pat = pat.value,
+                                ),
+                            )
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth().height(52.dp),
+                    enabled = !isWorking && organization.value.isNotBlank() && pat.value.isNotBlank(),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = EditorialColors.primary,
@@ -216,9 +271,19 @@ fun LoginScreen(onConnect: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center,
                     ) {
+                        if (isWorking) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(22.dp),
+                                strokeWidth = 2.dp,
+                                color = EditorialColors.onPrimary,
+                            )
+                            Spacer(Modifier.width(12.dp))
+                        }
                         Text("Connect to The Ledger", fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.width(8.dp))
-                        Icon(Icons.Outlined.ArrowForward, contentDescription = null)
+                        if (!isWorking) {
+                            Spacer(Modifier.width(8.dp))
+                            Icon(Icons.Outlined.ArrowForward, contentDescription = null)
+                        }
                     }
                 }
                 Spacer(Modifier.height(32.dp))
