@@ -1,4 +1,6 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.gradle.jvm.toolchain.JavaLanguageVersion
+import org.gradle.api.tasks.JavaExec
 
 plugins {
     alias(libs.plugins.kotlinJvm)
@@ -9,12 +11,12 @@ plugins {
 group = "dev.azure.desktop"
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
 }
 
 dependencies {
@@ -23,6 +25,7 @@ dependencies {
     implementation(project(":feature-pr"))
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.swing)
+    implementation(libs.snipme.highlights)
     implementation(compose.desktop.currentOs)
     implementation(compose.runtime)
     implementation(compose.foundation)
@@ -40,5 +43,16 @@ compose.desktop {
             packageName = "ADO Desktop"
             packageVersion = "1.0.0"
         }
+    }
+}
+
+tasks.withType<JavaExec>().configureEach {
+    val launcherProvider = javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+
+    javaLauncher.set(launcherProvider)
+    doFirst {
+        executable = javaLauncher.get().executablePath.asFile.absolutePath
     }
 }

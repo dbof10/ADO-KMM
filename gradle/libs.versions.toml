@@ -7,6 +7,7 @@ flowredux = "1.2.2"
 microsoft-credential-storage = "1.0.3"
 slf4j = "2.0.16"
 serialization = "1.8.0"
+highlights = "1.1.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -19,6 +20,7 @@ ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "k
 microsoft-credential-secure-storage = { module = "com.microsoft:credential-secure-storage", version.ref = "microsoft-credential-storage" }
 slf4j-nop = { module = "org.slf4j:slf4j-nop", version.ref = "slf4j" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+snipme-highlights = { module = "dev.snipme:highlights", version.ref = "highlights" }
 
 [plugins]
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
