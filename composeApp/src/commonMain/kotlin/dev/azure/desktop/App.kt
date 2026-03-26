@@ -33,7 +33,7 @@ import dev.azure.desktop.release.detail.ReleaseDetailStateMachine
 import dev.azure.desktop.release.list.ReleaseListStateMachine
 import dev.azure.desktop.theme.EditorialTheme
 import dev.azure.desktop.ui.screens.CodeReviewScreen
-import dev.azure.desktop.ui.screens.DesignSystemScreen
+import dev.azure.desktop.ui.screens.SettingsScreen
 import dev.azure.desktop.ui.screens.LoginScreen
 import dev.azure.desktop.ui.screens.PrListScreen
 import dev.azure.desktop.ui.screens.PrOverviewScreen
@@ -331,14 +331,16 @@ fun App() {
                     },
                 )
 
-            AppScreen.DesignSystem ->
+            AppScreen.Settings ->
                 MainShell(
-                    screen = AppScreen.DesignSystem,
+                    screen = AppScreen.Settings,
                     onNavigate = { screen.value = it },
                     onSignOut = signOut,
                     content = {
-                        DesignSystemScreen(
-                            onBack = { screen.value = AppScreen.PrList },
+                        SettingsScreen(
+                            organization = organization,
+                            patToken = authBridge.patStorage.loadPat().orEmpty(),
+                            onSignOut = signOut,
                             onClearCache = { pullRequestBridge.clearProjectSelectionCountsUseCase() },
                             modifier = Modifier.fillMaxSize(),
                         )

@@ -1,0 +1,19 @@
+{
+  "name": "assets/9391b4dcb4e84bc1995d53b97f93a248",
+  "displayName": "Azure Meridian Dark",
+  "theme": {
+    "colorMode": "DARK",
+    "font": "INTER",
+    "roundness": "ROUND_FOUR",
+    "customColor": "#3b82f6",
+    "headlineFont": "INTER",
+    "bodyFont": "INTER",
+    "labelFont": "INTER",
+    "colorVariant": "VIBRANT",
+    "overridePrimaryColor": "#3b82f6",
+    "overrideSecondaryColor": "#64748b",
+    "overrideTertiaryColor": "#0ea5e9",
+    "overrideNeutralColor": "#0f172a",
+    "spacingScale": 1
+  }
+}

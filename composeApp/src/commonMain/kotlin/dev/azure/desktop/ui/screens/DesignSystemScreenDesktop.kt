@@ -6,13 +6,17 @@ import androidx.compose.ui.Modifier
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun DesignSystemScreenDesktop(
-    onBack: () -> Unit,
+internal fun SettingsScreenDesktop(
+    organization: String,
+    patToken: String,
+    onSignOut: () -> Unit,
     onClearCache: () -> Result<Unit>,
     modifier: Modifier = Modifier,
 ) {
-    DesignSystemScreenContent(
-        onBack = onBack,
+    SettingsScreenContent(
+        organization = organization,
+        patToken = patToken,
+        onSignOut = onSignOut,
         onClearCache = onClearCache,
         modifier = modifier,
     )
