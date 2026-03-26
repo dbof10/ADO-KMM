@@ -26,6 +26,7 @@ import dev.azure.desktop.navigation.AppScreen
 import dev.azure.desktop.pr.detail.PrDetailState
 import dev.azure.desktop.pr.detail.PrDetailAction
 import dev.azure.desktop.pr.detail.PrDetailStateMachine
+import dev.azure.desktop.pr.list.PrListState
 import dev.azure.desktop.pr.review.CodeReviewStateMachine
 import dev.azure.desktop.pr.list.PrListStateMachine
 import dev.azure.desktop.release.detail.ReleaseDetailStateMachine
@@ -111,6 +112,15 @@ fun App() {
                 null
             }
         }
+        // FlowRedux allows only one collector and restarts from initial state when collection stops.
+        // Keep collecting while on list *or* detail so navigating to PR detail does not reset list state.
+        var prListUiState by remember { mutableStateOf<PrListState>(PrListState.LoadingProjects) }
+        val collectPrListState =
+            screen.value == AppScreen.PrList || screen.value == AppScreen.PrDetail
+        LaunchedEffect(prListStateMachine, collectPrListState, loginMachineEpoch) {
+            if (!collectPrListState) return@LaunchedEffect
+            prListStateMachine.state.collect { prListUiState = it }
+        }
 
         // FlowRedux allows only one collector and restarts from initial state when collection stops.
         // Keep collecting while on list *or* detail so navigating to release detail does not reset project/definition.
@@ -185,6 +195,7 @@ fun App() {
                     content = {
                         PrListScreen(
                             stateMachine = prListStateMachine,
+                            listState = prListUiState,
                             onOpenPullRequest = {
                                 selectedPullRequest = it
                                 screen.value = AppScreen.PrDetail
@@ -231,6 +242,10 @@ fun App() {
                                             codeReviewStateMachine = reviewMachine,
                                             isVoting = current.isVoting,
                                             voteErrorMessage = current.voteErrorMessage,
+                                            onBack = {
+                                                selectedPullRequest = null
+                                                screen.value = AppScreen.PrList
+                                            },
                                             onApprove = { scope.launch { detailMachine.dispatch(PrDetailAction.Approve) } },
                                             onReject = { scope.launch { detailMachine.dispatch(PrDetailAction.Reject) } },
                                             modifier = Modifier.fillMaxSize(),

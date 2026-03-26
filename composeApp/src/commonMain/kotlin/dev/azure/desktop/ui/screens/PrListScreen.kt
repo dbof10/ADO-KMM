@@ -56,22 +56,19 @@ import kotlinx.coroutines.launch
 @Composable
 fun PrListScreen(
     stateMachine: PrListStateMachine,
+    listState: PrListState,
     onOpenPullRequest: (PullRequestSummary) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
-    var state by remember { mutableStateOf<PrListState>(PrListState.LoadingProjects) }
     var prNumberInput by remember { mutableStateOf("") }
-    LaunchedEffect(stateMachine) {
-        stateMachine.state.collect { state = it }
-    }
 
     BoxWithConstraints(modifier.fillMaxSize()) {
         val compactLayout = layoutClassForWidth(maxWidth) == LayoutClass.Compact
         if (compactLayout) {
             PrListScreenMobile(
                 stateMachine = stateMachine,
-                state = state,
+                state = listState,
                 prNumberInput = prNumberInput,
                 onPrNumberInputChange = { prNumberInput = it },
                 onOpenPullRequest = onOpenPullRequest,
@@ -80,7 +77,7 @@ fun PrListScreen(
         } else {
             PrListScreenDesktop(
                 stateMachine = stateMachine,
-                state = state,
+                state = listState,
                 prNumberInput = prNumberInput,
                 onPrNumberInputChange = { prNumberInput = it },
                 onOpenPullRequest = onOpenPullRequest,

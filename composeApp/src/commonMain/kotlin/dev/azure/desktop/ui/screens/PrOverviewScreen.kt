@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Commit
@@ -32,6 +33,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -72,6 +74,7 @@ fun PrOverviewScreen(
     codeReviewStateMachine: CodeReviewStateMachine,
     isVoting: Boolean,
     voteErrorMessage: String?,
+    onBack: () -> Unit,
     onApprove: () -> Unit,
     onReject: () -> Unit,
     modifier: Modifier = Modifier,
@@ -88,6 +91,7 @@ fun PrOverviewScreen(
                 codeReviewStateMachine = codeReviewStateMachine,
                 isVoting = isVoting,
                 voteErrorMessage = voteErrorMessage,
+                onBack = onBack,
                 onApprove = onApprove,
                 onReject = onReject,
                 modifier = Modifier.fillMaxSize(),
@@ -98,6 +102,7 @@ fun PrOverviewScreen(
                 codeReviewStateMachine = codeReviewStateMachine,
                 isVoting = isVoting,
                 voteErrorMessage = voteErrorMessage,
+                onBack = onBack,
                 onApprove = onApprove,
                 onReject = onReject,
                 modifier = Modifier.fillMaxSize(),
@@ -112,6 +117,7 @@ internal fun PrOverviewScreenContent(
     codeReviewStateMachine: CodeReviewStateMachine,
     isVoting: Boolean,
     voteErrorMessage: String?,
+    onBack: () -> Unit,
     onApprove: () -> Unit,
     onReject: () -> Unit,
     modifier: Modifier = Modifier,
@@ -129,6 +135,12 @@ internal fun PrOverviewScreenContent(
                 ),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = "Back",
+                        )
+                    }
                     Surface(
                         color = EditorialColors.primaryFixed,
                         shape = RoundedCornerShape(999.dp),
