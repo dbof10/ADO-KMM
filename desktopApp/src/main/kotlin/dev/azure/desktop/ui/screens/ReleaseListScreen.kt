@@ -16,19 +16,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material.icons.outlined.List
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
-import androidx.compose.material.icons.outlined.RocketLaunch
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -43,7 +37,6 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -74,19 +68,16 @@ import kotlinx.coroutines.launch
 fun ReleaseListScreen(
     organization: String,
     stateMachine: ReleaseListStateMachine,
+    listState: ReleaseListState,
     onOpenRelease: (ReleaseSummary) -> Unit,
     getReleaseDefinition: suspend (String, Int) -> Result<ReleaseDefinitionDetail>,
     createRelease: suspend (CreateReleaseParams) -> Result<CreatedRelease>,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
-    var state by remember { mutableStateOf<ReleaseListState>(ReleaseListState.LoadingProjects) }
-    LaunchedEffect(stateMachine) {
-        stateMachine.state.collect { state = it }
-    }
 
     Surface(modifier.fillMaxSize(), color = EditorialColors.surfaceContainerLow) {
-        when (val current = state) {
+        when (val current = listState) {
             ReleaseListState.LoadingProjects ->
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -132,10 +123,20 @@ fun ReleaseListScreen(
                         onRefresh = { scope.launch { stateMachine.dispatch(ReleaseListAction.Refresh) } },
                     )
                     Spacer(Modifier.height(24.dp))
-                    Text(current.message, color = EditorialColors.error)
-                    Spacer(Modifier.height(12.dp))
-                    Button(onClick = { scope.launch { stateMachine.dispatch(ReleaseListAction.Refresh) } }) {
-                        Text("Retry")
+                    Column(
+                        Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            current.message,
+                            color = EditorialColors.error,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Button(onClick = { scope.launch { stateMachine.dispatch(ReleaseListAction.Refresh) } }) {
+                            Text("Retry")
+                        }
                     }
                 }
 
@@ -175,10 +176,20 @@ fun ReleaseListScreen(
                         },
                     )
                     Spacer(Modifier.height(16.dp))
-                    Text(current.message, color = EditorialColors.error)
-                    Spacer(Modifier.height(12.dp))
-                    Button(onClick = { scope.launch { stateMachine.dispatch(ReleaseListAction.Refresh) } }) {
-                        Text("Retry")
+                    Column(
+                        Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            current.message,
+                            color = EditorialColors.error,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Button(onClick = { scope.launch { stateMachine.dispatch(ReleaseListAction.Refresh) } }) {
+                            Text("Retry")
+                        }
                     }
                 }
 
@@ -257,10 +268,6 @@ private fun ReleaseListLayout(
                     releases = releases,
                     busy = listBusy,
                     onOpenRelease = onOpenRelease,
-                    canCreateRelease = selectedDefinitionId != null && !listBusy,
-                    onCreateReleaseClick = {
-                        if (selectedDefinitionId != null) showCreateDialog = true
-                    },
                 )
             }
         }
@@ -376,11 +383,11 @@ private fun ReleaseLeftRail(
             else definitions.filter { it.name.lowercase().contains(q) }
         }
     Column(Modifier.fillMaxSize().padding(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.List, null, tint = EditorialColors.outline, modifier = Modifier.padding(4.dp))
-            Icon(Icons.Outlined.FolderOpen, null, tint = EditorialColors.outline, modifier = Modifier.padding(4.dp))
-            Icon(Icons.Outlined.RocketLaunch, null, tint = EditorialColors.primary, modifier = Modifier.padding(4.dp))
-            Spacer(Modifier.weight(1f))
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             OutlinedButton(
                 onClick = onNewRelease,
                 enabled = selectedDefinitionId != null,
@@ -441,28 +448,12 @@ private fun ReleaseMainPanel(
     releases: List<ReleaseSummary>,
     busy: Boolean,
     onOpenRelease: (ReleaseSummary) -> Unit,
-    canCreateRelease: Boolean,
-    onCreateReleaseClick: () -> Unit,
 ) {
     var mainTab by remember { mutableIntStateOf(0) }
     val defName = definitions.firstOrNull { it.id == selectedDefinitionId }?.name.orEmpty()
 
     Column(Modifier.fillMaxSize().padding(20.dp)) {
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(defName.ifBlank { "Pipelines" }, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Button(
-                onClick = onCreateReleaseClick,
-                enabled = canCreateRelease,
-                colors = ButtonDefaults.buttonColors(containerColor = EditorialColors.primaryContainer),
-                shape = RoundedCornerShape(10.dp),
-            ) {
-                Text("Create release")
-            }
-        }
+        Text(defName.ifBlank { "Pipelines" }, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
         TabRow(
             selectedTabIndex = mainTab,
@@ -484,11 +475,6 @@ private fun ReleaseMainPanel(
                 selected = mainTab == 1,
                 onClick = { mainTab = 1 },
                 text = { Text("Deployments", fontWeight = if (mainTab == 1) FontWeight.Bold else FontWeight.Medium) },
-            )
-            Tab(
-                selected = mainTab == 2,
-                onClick = { mainTab = 2 },
-                text = { Text("Analytics", fontWeight = if (mainTab == 2) FontWeight.Bold else FontWeight.Medium) },
             )
         }
         Spacer(Modifier.height(16.dp))
@@ -516,14 +502,6 @@ private fun ReleaseMainPanel(
                     }
                 } else {
                     DeploymentsFromReleasesTable(releases = releases, onOpenRelease = onOpenRelease)
-                }
-            2 ->
-                if (busy) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                } else {
-                    ReleaseStatusSummaryCard(releases = releases)
                 }
         }
     }
@@ -650,42 +628,6 @@ private fun DeploymentsFromReleasesTable(
                     Text(rel.name, color = EditorialColors.primary, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(envName, modifier = Modifier.weight(0.9f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(st.name, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.6f))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ReleaseStatusSummaryCard(releases: List<ReleaseSummary>) {
-    val counts =
-        remember(releases) {
-            releases.groupingBy { it.status?.lowercase() ?: "unknown" }.eachCount()
-        }
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            "Release status (loaded page)",
-            fontWeight = FontWeight.SemiBold,
-            style = MaterialTheme.typography.titleSmall,
-        )
-        Text(
-            "Counts are from the same Azure DevOps release list response as the Releases tab (not a separate analytics service).",
-            style = MaterialTheme.typography.bodySmall,
-            color = EditorialColors.onSurfaceVariant,
-        )
-        if (releases.isEmpty()) {
-            Text("No data loaded.", color = EditorialColors.onSurfaceVariant)
-        } else {
-            counts.toList().sortedBy { it.first }.forEach { (status, n) ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(status)
-                    Text("$n", fontWeight = FontWeight.Medium)
                 }
             }
         }

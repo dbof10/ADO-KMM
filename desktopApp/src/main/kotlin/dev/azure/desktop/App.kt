@@ -19,6 +19,7 @@ import dev.azure.desktop.data.release.JvmReleaseServices
 import dev.azure.desktop.domain.pr.PullRequestSummary
 import dev.azure.desktop.domain.release.ReleaseSummary
 import dev.azure.desktop.login.LoginStateMachine
+import dev.azure.desktop.release.list.ReleaseListState
 import dev.azure.desktop.navigation.AppScreen
 import dev.azure.desktop.pr.detail.PrDetailState
 import dev.azure.desktop.pr.detail.PrDetailAction
@@ -108,6 +109,21 @@ fun App() {
             } else {
                 null
             }
+        }
+
+        // FlowRedux allows only one collector and restarts from initial state when collection stops.
+        // Keep collecting while on list *or* detail so navigating to release detail does not reset project/definition.
+        var releaseListUiState by remember { mutableStateOf<ReleaseListState>(ReleaseListState.LoadingProjects) }
+        val collectReleaseListState =
+            screen.value == AppScreen.ReleaseList || screen.value == AppScreen.ReleaseDetail
+        LaunchedEffect(releaseListStateMachine, collectReleaseListState, loginMachineEpoch) {
+            val machine = releaseListStateMachine
+            if (machine == null) {
+                releaseListUiState = ReleaseListState.LoadingProjects
+                return@LaunchedEffect
+            }
+            if (!collectReleaseListState) return@LaunchedEffect
+            machine.state.collect { releaseListUiState = it }
         }
         val releaseDetailStateMachine = remember(selectedRelease, organization, loginMachineEpoch) {
             selectedRelease?.let { rel ->
@@ -253,6 +269,7 @@ fun App() {
                             ReleaseListScreen(
                                 organization = organization,
                                 stateMachine = machine,
+                                listState = releaseListUiState,
                                 onOpenRelease = {
                                     selectedRelease = it
                                     screen.value = AppScreen.ReleaseDetail
