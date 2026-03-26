@@ -61,10 +61,10 @@ import dev.azure.desktop.domain.pr.PullRequestReviewer
 import dev.azure.desktop.domain.pr.PullRequestTimelineItem
 import dev.azure.desktop.pr.review.CodeReviewStateMachine
 import dev.azure.desktop.theme.EditorialColors
+import dev.azure.desktop.ui.adaptive.LayoutClass
+import dev.azure.desktop.ui.adaptive.layoutClassForWidth
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-
-private val PrOverviewCompactBreakpoint = 900.dp
 
 @Composable
 fun PrOverviewScreen(
@@ -76,15 +76,50 @@ fun PrOverviewScreen(
     onReject: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val summary = detail.summary
-    var selectedTab by remember { mutableIntStateOf(0) }
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(EditorialColors.surfaceContainerLow),
     ) {
-        val compactLayout = maxWidth < PrOverviewCompactBreakpoint
-        Column(modifier = Modifier.fillMaxSize()) {
+        val compactLayout = layoutClassForWidth(maxWidth) == LayoutClass.Compact
+        if (compactLayout) {
+            PrOverviewScreenMobile(
+                detail = detail,
+                codeReviewStateMachine = codeReviewStateMachine,
+                isVoting = isVoting,
+                voteErrorMessage = voteErrorMessage,
+                onApprove = onApprove,
+                onReject = onReject,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            PrOverviewScreenDesktop(
+                detail = detail,
+                codeReviewStateMachine = codeReviewStateMachine,
+                isVoting = isVoting,
+                voteErrorMessage = voteErrorMessage,
+                onApprove = onApprove,
+                onReject = onReject,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+@Composable
+internal fun PrOverviewScreenContent(
+    detail: PullRequestDetail,
+    codeReviewStateMachine: CodeReviewStateMachine,
+    isVoting: Boolean,
+    voteErrorMessage: String?,
+    onApprove: () -> Unit,
+    onReject: () -> Unit,
+    modifier: Modifier = Modifier,
+    compactLayout: Boolean,
+) {
+    val summary = detail.summary
+    var selectedTab by remember { mutableIntStateOf(0) }
+    Column(modifier = modifier.fillMaxSize()) {
             Column(
                 Modifier.padding(
                     start = if (compactLayout) 16.dp else 32.dp,
@@ -229,7 +264,6 @@ fun PrOverviewScreen(
                     }
             }
         }
-    }
 }
 
 @Composable

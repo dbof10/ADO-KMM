@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -62,6 +63,8 @@ import dev.azure.desktop.release.list.ReleaseListAction
 import dev.azure.desktop.release.list.ReleaseListState
 import dev.azure.desktop.release.list.ReleaseListStateMachine
 import dev.azure.desktop.theme.EditorialColors
+import dev.azure.desktop.ui.adaptive.LayoutClass
+import dev.azure.desktop.ui.adaptive.layoutClassForWidth
 import kotlinx.coroutines.launch
 
 @Composable
@@ -76,7 +79,43 @@ fun ReleaseListScreen(
 ) {
     val scope = rememberCoroutineScope()
 
-    Surface(modifier.fillMaxSize(), color = EditorialColors.surfaceContainerLow) {
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val compactLayout = layoutClassForWidth(maxWidth) == LayoutClass.Compact
+        if (compactLayout) {
+            ReleaseListScreenMobile(
+                organization = organization,
+                stateMachine = stateMachine,
+                listState = listState,
+                onOpenRelease = onOpenRelease,
+                getReleaseDefinition = getReleaseDefinition,
+                createRelease = createRelease,
+                scope = scope,
+            )
+        } else {
+            ReleaseListScreenDesktop(
+                organization = organization,
+                stateMachine = stateMachine,
+                listState = listState,
+                onOpenRelease = onOpenRelease,
+                getReleaseDefinition = getReleaseDefinition,
+                createRelease = createRelease,
+                scope = scope,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun ReleaseListScreenContent(
+    organization: String,
+    stateMachine: ReleaseListStateMachine,
+    listState: ReleaseListState,
+    onOpenRelease: (ReleaseSummary) -> Unit,
+    getReleaseDefinition: suspend (String, Int) -> Result<ReleaseDefinitionDetail>,
+    createRelease: suspend (CreateReleaseParams) -> Result<CreatedRelease>,
+    scope: kotlinx.coroutines.CoroutineScope,
+) {
+    Surface(Modifier.fillMaxSize(), color = EditorialColors.surfaceContainerLow) {
         when (val current = listState) {
             ReleaseListState.LoadingProjects ->
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -117,6 +156,7 @@ fun ReleaseListScreen(
             is ReleaseListState.DefinitionsError ->
                 Column(Modifier.fillMaxSize().padding(24.dp)) {
                     ProjectStrip(
+                        compactLayout = false,
                         projects = current.projects,
                         selectedProjectName = current.selectedProjectName,
                         onSelectProject = { scope.launch { stateMachine.dispatch(ReleaseListAction.SelectProject(it)) } },
@@ -199,6 +239,7 @@ fun ReleaseListScreen(
             is ReleaseListState.ReleasesError ->
                 Column(Modifier.fillMaxSize().padding(24.dp)) {
                     ProjectStrip(
+                        compactLayout = false,
                         projects = current.projects,
                         selectedProjectName = current.selectedProjectName,
                         onSelectProject = { scope.launch { stateMachine.dispatch(ReleaseListAction.SelectProject(it)) } },
@@ -252,18 +293,20 @@ private fun ReleaseListLayout(
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
 
-    Box(Modifier.fillMaxSize().padding(24.dp)) {
+    BoxWithConstraints(Modifier.fillMaxSize().padding(24.dp)) {
+        val compactLayout = layoutClassForWidth(maxWidth) == LayoutClass.Compact
         Column(Modifier.fillMaxSize()) {
             ProjectStrip(
+                compactLayout = compactLayout,
                 projects = projects,
                 selectedProjectName = selectedProjectName,
                 onSelectProject = onSelectProject,
                 onRefresh = onRefresh,
             )
             Spacer(Modifier.height(16.dp))
-            Row(Modifier.fillMaxSize()) {
+            if (compactLayout) {
                 Surface(
-                    Modifier.width(320.dp).fillMaxHeight(),
+                    Modifier.fillMaxWidth().height(220.dp),
                     color = EditorialColors.surfaceContainerLowest,
                     shape = RoundedCornerShape(12.dp),
                 ) {
@@ -276,9 +319,9 @@ private fun ReleaseListLayout(
                         },
                     )
                 }
-                Spacer(Modifier.width(16.dp))
+                Spacer(Modifier.height(12.dp))
                 Surface(
-                    Modifier.weight(1f).fillMaxHeight(),
+                    Modifier.fillMaxWidth().weight(1f),
                     color = EditorialColors.surfaceContainerLowest,
                     shape = RoundedCornerShape(12.dp),
                 ) {
@@ -289,6 +332,37 @@ private fun ReleaseListLayout(
                         busy = listBusy,
                         onOpenRelease = onOpenRelease,
                     )
+                }
+            } else {
+                Row(Modifier.fillMaxSize()) {
+                    Surface(
+                        Modifier.width(320.dp).fillMaxHeight(),
+                        color = EditorialColors.surfaceContainerLowest,
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        ReleaseLeftRail(
+                            definitions = definitions,
+                            selectedDefinitionId = selectedDefinitionId,
+                            onSelectDefinition = onSelectDefinition,
+                            onNewRelease = {
+                                if (selectedDefinitionId != null) showCreateDialog = true
+                            },
+                        )
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Surface(
+                        Modifier.weight(1f).fillMaxHeight(),
+                        color = EditorialColors.surfaceContainerLowest,
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        ReleaseMainPanel(
+                            definitions = definitions,
+                            selectedDefinitionId = selectedDefinitionId,
+                            releases = releases,
+                            busy = listBusy,
+                            onOpenRelease = onOpenRelease,
+                        )
+                    }
                 }
             }
         }
@@ -312,25 +386,49 @@ private fun ReleaseListLayout(
 
 @Composable
 private fun ProjectStrip(
+    compactLayout: Boolean,
     projects: List<DevOpsProject>,
     selectedProjectName: String,
     onSelectProject: (String) -> Unit,
     onRefresh: () -> Unit,
 ) {
-    Row(
-        Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text("Releases", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.weight(1f))
-        ProjectPickerOnly(
-            projects = projects,
-            selectedProjectName = selectedProjectName,
-            onSelect = onSelectProject,
-        )
-        OutlinedButton(onClick = onRefresh, shape = RoundedCornerShape(10.dp)) {
-            Text("Refresh")
+    if (compactLayout) {
+        Column(
+            Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("Releases", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            ProjectPickerOnly(
+                projects = projects,
+                selectedProjectName = selectedProjectName,
+                onSelect = onSelectProject,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedButton(
+                onClick = onRefresh,
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Refresh")
+            }
+        }
+    } else {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Releases", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+            ProjectPickerOnly(
+                projects = projects,
+                selectedProjectName = selectedProjectName,
+                onSelect = onSelectProject,
+                modifier = Modifier.width(220.dp),
+            )
+            OutlinedButton(onClick = onRefresh, shape = RoundedCornerShape(10.dp)) {
+                Text("Refresh")
+            }
         }
     }
 }
@@ -362,9 +460,10 @@ private fun ProjectPickerOnly(
     projects: List<DevOpsProject>,
     selectedProjectName: String,
     onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    Box(Modifier.width(220.dp)) {
+    Box(modifier) {
         OutlinedButton(
             onClick = { expanded = true },
             modifier = Modifier.fillMaxWidth().height(40.dp),

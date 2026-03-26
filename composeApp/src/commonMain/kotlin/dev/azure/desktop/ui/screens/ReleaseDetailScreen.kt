@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -58,6 +59,8 @@ import dev.azure.desktop.release.detail.ReleaseDetailAction
 import dev.azure.desktop.release.detail.ReleaseDetailState
 import dev.azure.desktop.release.detail.ReleaseDetailStateMachine
 import dev.azure.desktop.theme.EditorialColors
+import dev.azure.desktop.ui.adaptive.LayoutClass
+import dev.azure.desktop.ui.adaptive.layoutClassForWidth
 import kotlinx.coroutines.launch
 
 @Composable
@@ -72,7 +75,34 @@ fun ReleaseDetailScreen(
         stateMachine.state.collect { state = it }
     }
 
-    Surface(modifier.fillMaxSize(), color = EditorialColors.surfaceContainerLow) {
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val compactLayout = layoutClassForWidth(maxWidth) == LayoutClass.Compact
+        if (compactLayout) {
+            ReleaseDetailScreenMobile(
+                stateMachine = stateMachine,
+                state = state,
+                scope = scope,
+                onBack = onBack,
+            )
+        } else {
+            ReleaseDetailScreenDesktop(
+                stateMachine = stateMachine,
+                state = state,
+                scope = scope,
+                onBack = onBack,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun ReleaseDetailScreenContent(
+    stateMachine: ReleaseDetailStateMachine,
+    state: ReleaseDetailState,
+    scope: kotlinx.coroutines.CoroutineScope,
+    onBack: () -> Unit,
+) {
+    Surface(Modifier.fillMaxSize(), color = EditorialColors.surfaceContainerLow) {
         when (val current = state) {
             ReleaseDetailState.Loading ->
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -156,27 +186,56 @@ private fun ReleaseDetailBody(
         Spacer(Modifier.height(16.dp))
         when (tab) {
             0 ->
-                Row(Modifier.fillMaxSize()) {
-                    Surface(
-                        Modifier.width(320.dp).fillMaxSize(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = EditorialColors.surfaceContainerLowest,
-                    ) {
-                        ReleaseMetaColumn(detail = detail)
-                    }
-                    Spacer(Modifier.width(16.dp))
-                    Surface(
-                        Modifier.weight(1f).fillMaxSize(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = EditorialColors.surfaceContainerLowest,
-                    ) {
-                        StagesFlowColumn(
-                            environments = detail.environments,
-                            isDeploying = content.isDeploying,
-                            deployError = content.deployError,
-                            onReload = onReload,
-                            onDeploy = onDeploy,
-                        )
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                    val compactLayout = layoutClassForWidth(maxWidth) == LayoutClass.Compact
+                    if (compactLayout) {
+                        Column(Modifier.fillMaxSize()) {
+                            Surface(
+                                Modifier.fillMaxWidth().weight(0.38f),
+                                shape = RoundedCornerShape(12.dp),
+                                color = EditorialColors.surfaceContainerLowest,
+                            ) {
+                                ReleaseMetaColumn(detail = detail)
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            Surface(
+                                Modifier.fillMaxWidth().weight(0.62f),
+                                shape = RoundedCornerShape(12.dp),
+                                color = EditorialColors.surfaceContainerLowest,
+                            ) {
+                                StagesFlowColumn(
+                                    environments = detail.environments,
+                                    isDeploying = content.isDeploying,
+                                    deployError = content.deployError,
+                                    onReload = onReload,
+                                    onDeploy = onDeploy,
+                                )
+                            }
+                        }
+                    } else {
+                        Row(Modifier.fillMaxSize()) {
+                            Surface(
+                                Modifier.width(320.dp).fillMaxSize(),
+                                shape = RoundedCornerShape(12.dp),
+                                color = EditorialColors.surfaceContainerLowest,
+                            ) {
+                                ReleaseMetaColumn(detail = detail)
+                            }
+                            Spacer(Modifier.width(16.dp))
+                            Surface(
+                                Modifier.weight(1f).fillMaxSize(),
+                                shape = RoundedCornerShape(12.dp),
+                                color = EditorialColors.surfaceContainerLowest,
+                            ) {
+                                StagesFlowColumn(
+                                    environments = detail.environments,
+                                    isDeploying = content.isDeploying,
+                                    deployError = content.deployError,
+                                    onReload = onReload,
+                                    onDeploy = onDeploy,
+                                )
+                            }
+                        }
                     }
                 }
             1 ->

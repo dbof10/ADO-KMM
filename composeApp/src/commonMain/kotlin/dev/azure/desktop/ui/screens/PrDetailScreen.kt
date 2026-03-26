@@ -35,6 +35,8 @@ import dev.azure.desktop.pr.detail.PrDetailAction
 import dev.azure.desktop.pr.detail.PrDetailState
 import dev.azure.desktop.pr.detail.PrDetailStateMachine
 import dev.azure.desktop.theme.EditorialColors
+import dev.azure.desktop.ui.adaptive.LayoutClass
+import dev.azure.desktop.ui.adaptive.layoutClassForWidth
 import kotlinx.coroutines.launch
 
 @Composable
@@ -48,8 +50,26 @@ fun PrDetailScreen(
     LaunchedEffect(stateMachine) {
         stateMachine.state.collect { state = it }
     }
+
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxSize()) {
+        val compactLayout = layoutClassForWidth(maxWidth) == LayoutClass.Compact
+        if (compactLayout) {
+            PrDetailScreenMobile(stateMachine, state, onBack, scope)
+        } else {
+            PrDetailScreenDesktop(stateMachine, state, onBack, scope)
+        }
+    }
+}
+
+@Composable
+internal fun PrDetailScreenContent(
+    stateMachine: PrDetailStateMachine,
+    state: PrDetailState,
+    onBack: () -> Unit,
+    scope: kotlinx.coroutines.CoroutineScope,
+) {
     Box(
-        modifier
+        Modifier
             .fillMaxSize()
             .background(EditorialColors.surfaceContainerLow),
     ) {

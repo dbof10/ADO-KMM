@@ -3,6 +3,7 @@ package dev.azure.desktop.ui.screens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -48,6 +49,8 @@ import dev.azure.desktop.pr.list.PrListState
 import dev.azure.desktop.pr.list.PrListStateMachine
 import dev.azure.desktop.pr.list.PrListTab
 import dev.azure.desktop.theme.EditorialColors
+import dev.azure.desktop.ui.adaptive.LayoutClass
+import dev.azure.desktop.ui.adaptive.layoutClassForWidth
 import kotlinx.coroutines.launch
 
 @Composable
@@ -63,8 +66,42 @@ fun PrListScreen(
         stateMachine.state.collect { state = it }
     }
 
-    Surface(modifier.fillMaxSize(), color = EditorialColors.surfaceContainerLow) {
-        Column(Modifier.fillMaxSize().padding(24.dp)) {
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val compactLayout = layoutClassForWidth(maxWidth) == LayoutClass.Compact
+        if (compactLayout) {
+            PrListScreenMobile(
+                stateMachine = stateMachine,
+                state = state,
+                prNumberInput = prNumberInput,
+                onPrNumberInputChange = { prNumberInput = it },
+                onOpenPullRequest = onOpenPullRequest,
+                scope = scope,
+            )
+        } else {
+            PrListScreenDesktop(
+                stateMachine = stateMachine,
+                state = state,
+                prNumberInput = prNumberInput,
+                onPrNumberInputChange = { prNumberInput = it },
+                onOpenPullRequest = onOpenPullRequest,
+                scope = scope,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun PrListScreenContent(
+    stateMachine: PrListStateMachine,
+    state: PrListState,
+    prNumberInput: String,
+    onPrNumberInputChange: (String) -> Unit,
+    onOpenPullRequest: (PullRequestSummary) -> Unit,
+    scope: kotlinx.coroutines.CoroutineScope,
+    compactLayout: Boolean,
+) {
+    Surface(Modifier.fillMaxSize(), color = EditorialColors.surfaceContainerLow) {
+        Column(Modifier.fillMaxSize().padding(if (compactLayout) 16.dp else 24.dp)) {
             Text("Pull requests", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
 
@@ -95,6 +132,7 @@ fun PrListScreen(
 
                 is PrListState.LoadingPullRequests -> {
                     ProjectAndTabsRow(
+                        compactLayout = compactLayout,
                         projects = current.projects,
                         selectedProjectName = current.selectedProjectName,
                         selectedTab = current.tab,
@@ -102,7 +140,7 @@ fun PrListScreen(
                         rightOfProjectSelector = {
                             OpenPrByNumber(
                                 prNumberInput = prNumberInput,
-                                onPrNumberInputChange = { prNumberInput = it },
+                                onPrNumberInputChange = onPrNumberInputChange,
                                 onOpen = { id ->
                                     scope.launch { stateMachine.dispatch(PrListAction.OpenPullRequestById(id)) }
                                 },
@@ -123,6 +161,7 @@ fun PrListScreen(
 
                 is PrListState.Ready -> {
                     ProjectAndTabsRow(
+                        compactLayout = compactLayout,
                         projects = current.projects,
                         selectedProjectName = current.selectedProjectName,
                         selectedTab = current.tab,
@@ -130,7 +169,7 @@ fun PrListScreen(
                         rightOfProjectSelector = {
                             OpenPrByNumber(
                                 prNumberInput = prNumberInput,
-                                onPrNumberInputChange = { prNumberInput = it },
+                                onPrNumberInputChange = onPrNumberInputChange,
                                 onOpen = { id ->
                                     scope.launch { stateMachine.dispatch(PrListAction.OpenPullRequestById(id)) }
                                 },
@@ -165,6 +204,7 @@ fun PrListScreen(
 
                 is PrListState.PullRequestsError -> {
                     ProjectAndTabsRow(
+                        compactLayout = compactLayout,
                         projects = current.projects,
                         selectedProjectName = current.selectedProjectName,
                         selectedTab = current.tab,
@@ -172,7 +212,7 @@ fun PrListScreen(
                         rightOfProjectSelector = {
                             OpenPrByNumber(
                                 prNumberInput = prNumberInput,
-                                onPrNumberInputChange = { prNumberInput = it },
+                                onPrNumberInputChange = onPrNumberInputChange,
                                 onOpen = { id ->
                                     scope.launch { stateMachine.dispatch(PrListAction.OpenPullRequestById(id)) }
                                 },
@@ -201,6 +241,7 @@ fun PrListScreen(
 
 @Composable
 private fun ProjectAndTabsRow(
+    compactLayout: Boolean,
     projects: List<DevOpsProject>,
     selectedProjectName: String?,
     selectedTab: PrListTab,
@@ -211,20 +252,36 @@ private fun ProjectAndTabsRow(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Project", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            ProjectDropdown(
-                projects = projects,
-                selectedProjectName = selectedProjectName,
-                enabled = projectMenuEnabled,
-                modifier = Modifier.fillMaxWidth(0.25f),
-                onSelect = onSelectProject,
-            )
-            Spacer(Modifier.weight(1f))
-            rightOfProjectSelector?.invoke()
+        if (compactLayout) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ProjectDropdown(
+                    projects = projects,
+                    selectedProjectName = selectedProjectName,
+                    enabled = projectMenuEnabled,
+                    modifier = Modifier.fillMaxWidth(),
+                    onSelect = onSelectProject,
+                )
+                rightOfProjectSelector?.invoke()
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                ProjectDropdown(
+                    projects = projects,
+                    selectedProjectName = selectedProjectName,
+                    enabled = projectMenuEnabled,
+                    modifier = Modifier.fillMaxWidth(0.25f),
+                    onSelect = onSelectProject,
+                )
+                Spacer(Modifier.weight(1f))
+                rightOfProjectSelector?.invoke()
+            }
         }
         TabRow(
             selectedTabIndex = if (selectedTab == PrListTab.Mine) 0 else 1,
@@ -266,13 +323,14 @@ private fun OpenPrByNumber(
     enabled: Boolean,
 ) {
     Row(
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         OutlinedTextField(
             value = prNumberInput,
             onValueChange = { raw -> onPrNumberInputChange(raw.filter { ch -> ch.isDigit() }.take(12)) },
-            modifier = Modifier.width(220.dp),
+            modifier = Modifier.weight(1f),
             singleLine = true,
             label = { Text("Open PR by #") },
             placeholder = { Text("130041") },

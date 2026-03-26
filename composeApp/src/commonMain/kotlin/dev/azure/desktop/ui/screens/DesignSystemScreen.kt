@@ -37,10 +37,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.azure.desktop.theme.EditorialColors
+import dev.azure.desktop.ui.adaptive.LayoutClass
+import dev.azure.desktop.ui.adaptive.layoutClassForWidth
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DesignSystemScreen(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxSize()) {
+        val compactLayout = layoutClassForWidth(maxWidth) == LayoutClass.Compact
+        if (compactLayout) {
+            DesignSystemScreenMobile(onBack = onBack, modifier = Modifier.fillMaxSize())
+        } else {
+            DesignSystemScreenDesktop(onBack = onBack, modifier = Modifier.fillMaxSize())
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun DesignSystemScreenContent(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {

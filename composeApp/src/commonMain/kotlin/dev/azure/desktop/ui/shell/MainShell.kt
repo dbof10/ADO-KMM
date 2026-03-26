@@ -15,10 +15,11 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
 import dev.azure.desktop.navigation.AppScreen
 import dev.azure.desktop.theme.EditorialColors
+import dev.azure.desktop.ui.adaptive.LayoutClass
+import dev.azure.desktop.ui.adaptive.layoutClassForWidth
 
 @Composable
 internal fun MainShell(
@@ -37,7 +38,7 @@ internal fun MainShell(
         AppScreen.Login -> null
     }
     BoxWithConstraints(Modifier.fillMaxSize().background(EditorialColors.surface)) {
-        val compactLayout = maxWidth < 900.dp
+        val compactLayout = layoutClassForWidth(maxWidth) != LayoutClass.Expanded
         if (compactLayout) {
             Column(Modifier.fillMaxSize()) {
                 Box(Modifier.weight(1f).fillMaxSize()) {
