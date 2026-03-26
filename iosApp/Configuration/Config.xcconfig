@@ -1,3 +1,5 @@
+#include? "Version.xcconfig"
+
 TEAM_ID=
 BUNDLE_ID=dev.azure.desktop.iosApp
 APP_NAME=ADO Desktop iOS

@@ -2,6 +2,7 @@ import org.gradle.api.tasks.JavaExec
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -11,6 +12,15 @@ plugins {
 }
 
 group = "dev.azure.desktop"
+
+val versionProperties = Properties().apply {
+    val versionFile = rootProject.file("version.properties")
+    if (versionFile.exists()) {
+        versionFile.inputStream().use { load(it) }
+    }
+}
+val appVersionName = versionProperties.getProperty("VERSION_NAME", "1.0.0")
+val appVersionCode = versionProperties.getProperty("VERSION_CODE", "1").toInt()
 
 kotlin {
     jvmToolchain(21)
@@ -71,8 +81,8 @@ android {
         applicationId = "dev.azure.desktop"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.compileSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
     }
     packaging {
         resources {
@@ -94,7 +104,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "ADO Desktop"
-            packageVersion = "1.0.0"
+            packageVersion = appVersionName
         }
     }
 }

@@ -30,6 +30,29 @@ fun ensureAndroidSdkInLocalProperties(rootDir: File) {
     }
 }
 
+/**
+ * Sync app version values from [version.properties] to iOS xcconfig so all platforms share one source.
+ */
+fun ensureIosVersionConfig(rootDir: File) {
+    val propsFile = File(rootDir, "version.properties")
+    val props = Properties().apply {
+        if (propsFile.exists()) {
+            FileInputStream(propsFile).use { load(it) }
+        }
+    }
+    val versionName = props.getProperty("VERSION_NAME", "1.0.0")
+    val versionCode = props.getProperty("VERSION_CODE", "1")
+    val iosVersionConfig = File(rootDir, "iosApp/Configuration/Version.xcconfig")
+    iosVersionConfig.parentFile?.mkdirs()
+    iosVersionConfig.writeText(
+        """
+        // Auto-generated from version.properties. Do not edit manually.
+        VERSION_NAME=$versionName
+        VERSION_CODE=$versionCode
+        """.trimIndent() + "\n",
+    )
+}
+
 pluginManagement {
     repositories {
         google()
@@ -56,5 +79,6 @@ dependencyResolutionManagement {
 }
 
 ensureAndroidSdkInLocalProperties(settings.rootDir)
+ensureIosVersionConfig(settings.rootDir)
 
 include(":common", ":feature-login", ":feature-pr", ":composeApp")
