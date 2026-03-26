@@ -94,7 +94,7 @@ internal fun SideRail(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             RailIcon(
-                selected = false,
+                selected = selected == MainTab.Design,
                 icon = Icons.Outlined.Settings,
                 contentDescription = "Design system",
                 onClick = onSettings,

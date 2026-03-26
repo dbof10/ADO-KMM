@@ -299,84 +299,45 @@ private fun ReleaseListLayout(
     var showCreateDialog by remember { mutableStateOf(false) }
 
     BoxWithConstraints(Modifier.fillMaxSize().padding(if (compactLayout) 16.dp else 24.dp)) {
-        Column(Modifier.fillMaxSize()) {
-            ProjectStrip(
-                compactLayout = compactLayout,
+        if (compactLayout) {
+            ReleaseListLayoutMobile(
                 projects = projects,
                 selectedProjectName = selectedProjectName,
                 onSelectProject = onSelectProject,
+                definitions = definitions,
+                selectedDefinitionId = selectedDefinitionId,
+                onSelectDefinition = onSelectDefinition,
+                releases = releases,
+                listBusy = listBusy,
                 onRefresh = onRefresh,
+                onOpenRelease = onOpenRelease,
+                onNewRelease = {
+                    if (selectedDefinitionId != null) showCreateDialog = true
+                },
             )
-            Spacer(Modifier.height(16.dp))
-            if (compactLayout) {
-                Surface(
-                    Modifier.fillMaxWidth().height(220.dp),
-                    color = EditorialColors.surfaceContainerLowest,
-                    shape = RoundedCornerShape(12.dp),
-                ) {
-                    ReleaseLeftRail(
-                        definitions = definitions,
-                        selectedDefinitionId = selectedDefinitionId,
-                        onSelectDefinition = onSelectDefinition,
-                        onNewRelease = {
-                            if (selectedDefinitionId != null) showCreateDialog = true
-                        },
-                    )
-                }
-                Spacer(Modifier.height(12.dp))
-                Surface(
-                    Modifier.fillMaxWidth().weight(1f),
-                    color = EditorialColors.surfaceContainerLowest,
-                    shape = RoundedCornerShape(12.dp),
-                ) {
-                    ReleaseMainPanel(
-                        definitions = definitions,
-                        selectedDefinitionId = selectedDefinitionId,
-                        releases = releases,
-                        busy = listBusy,
-                        onOpenRelease = onOpenRelease,
-                        compactLayout = compactLayout,
-                    )
-                }
-            } else {
-                Row(Modifier.fillMaxSize()) {
-                    Surface(
-                        Modifier.width(320.dp).fillMaxHeight(),
-                        color = EditorialColors.surfaceContainerLowest,
-                        shape = RoundedCornerShape(12.dp),
-                    ) {
-                        ReleaseLeftRail(
-                            definitions = definitions,
-                            selectedDefinitionId = selectedDefinitionId,
-                            onSelectDefinition = onSelectDefinition,
-                            onNewRelease = {
-                                if (selectedDefinitionId != null) showCreateDialog = true
-                            },
-                        )
-                    }
-                    Spacer(Modifier.width(16.dp))
-                    Surface(
-                        Modifier.weight(1f).fillMaxHeight(),
-                        color = EditorialColors.surfaceContainerLowest,
-                        shape = RoundedCornerShape(12.dp),
-                    ) {
-                        ReleaseMainPanel(
-                            definitions = definitions,
-                            selectedDefinitionId = selectedDefinitionId,
-                            releases = releases,
-                            busy = listBusy,
-                            onOpenRelease = onOpenRelease,
-                            compactLayout = compactLayout,
-                        )
-                    }
-                }
-            }
+        } else {
+            ReleaseListLayoutDesktop(
+                projects = projects,
+                selectedProjectName = selectedProjectName,
+                onSelectProject = onSelectProject,
+                definitions = definitions,
+                selectedDefinitionId = selectedDefinitionId,
+                onSelectDefinition = onSelectDefinition,
+                releases = releases,
+                listBusy = listBusy,
+                onRefresh = onRefresh,
+                onOpenRelease = onOpenRelease,
+                onNewRelease = {
+                    if (selectedDefinitionId != null) showCreateDialog = true
+                },
+            )
         }
 
         val defId = selectedDefinitionId
         if (defId != null) {
             CreateReleaseDialog(
                 visible = showCreateDialog,
+                compactLayout = compactLayout,
                 organization = organization,
                 projectName = selectedProjectName,
                 definitionId = defId,
@@ -391,7 +352,7 @@ private fun ReleaseListLayout(
 }
 
 @Composable
-private fun ProjectStrip(
+internal fun ProjectStrip(
     compactLayout: Boolean,
     projects: List<DevOpsProject>,
     selectedProjectName: String,
@@ -399,24 +360,19 @@ private fun ProjectStrip(
     onRefresh: () -> Unit,
 ) {
     if (compactLayout) {
-        Column(
+        Row(
             Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text("Releases", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
             ProjectPickerOnly(
                 projects = projects,
                 selectedProjectName = selectedProjectName,
                 onSelect = onSelectProject,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.width(220.dp),
             )
-            OutlinedButton(
-                onClick = onRefresh,
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Refresh")
-            }
         }
     } else {
         Row(
@@ -502,7 +458,7 @@ private fun ProjectPickerOnly(
 }
 
 @Composable
-private fun ReleaseLeftRail(
+internal fun ReleaseLeftRail(
     definitions: List<ReleaseDefinitionSummary>,
     selectedDefinitionId: Int?,
     onSelectDefinition: (Int) -> Unit,
@@ -575,7 +531,7 @@ private fun Modifier.pipelineRowBg(selected: Boolean): Modifier {
 }
 
 @Composable
-private fun ReleaseMainPanel(
+internal fun ReleaseMainPanel(
     definitions: List<ReleaseDefinitionSummary>,
     selectedDefinitionId: Int?,
     releases: List<ReleaseSummary>,
@@ -650,7 +606,7 @@ private fun ReleaseMainPanel(
 }
 
 @Composable
-private fun ReleaseTable(
+internal fun ReleaseTable(
     releases: List<ReleaseSummary>,
     onRowClick: (ReleaseSummary) -> Unit,
     compactLayout: Boolean,
@@ -758,7 +714,7 @@ private fun StageMiniPill(pill: ReleaseStagePill) {
 }
 
 @Composable
-private fun DeploymentsFromReleasesTable(
+internal fun DeploymentsFromReleasesTable(
     releases: List<ReleaseSummary>,
     onOpenRelease: (ReleaseSummary) -> Unit,
     compactLayout: Boolean,

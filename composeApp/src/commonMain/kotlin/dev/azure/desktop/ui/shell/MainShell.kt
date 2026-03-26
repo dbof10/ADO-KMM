@@ -34,7 +34,7 @@ internal fun MainShell(
         AppScreen.CodeReview -> null
         AppScreen.ReleaseList -> MainTab.Releases
         AppScreen.ReleaseDetail -> MainTab.Releases
-        AppScreen.DesignSystem -> null
+        AppScreen.DesignSystem -> MainTab.Design
         AppScreen.Login -> null
     }
     BoxWithConstraints(Modifier.fillMaxSize().background(EditorialColors.surface)) {
@@ -59,7 +59,7 @@ internal fun MainShell(
                             label = { Text("Releases") },
                         )
                         NavigationBarItem(
-                            selected = false,
+                            selected = tab == MainTab.Design,
                             onClick = { onNavigate(AppScreen.DesignSystem) },
                             icon = { Icon(Icons.Outlined.Settings, contentDescription = "Design") },
                             label = { Text("Design") },
