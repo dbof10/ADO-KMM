@@ -3,6 +3,7 @@ package dev.azure.desktop.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -57,6 +58,8 @@ import dev.azure.desktop.theme.EditorialColors
 import dev.azure.desktop.ui.components.LoginErrorView
 import kotlinx.coroutines.launch
 
+private val CompactLayoutBreakpoint = 900.dp
+
 @Composable
 fun LoginScreen(
     stateMachine: LoginStateMachine,
@@ -88,169 +91,126 @@ fun LoginScreen(
             .fillMaxSize()
             .background(EditorialColors.surfaceContainerLow),
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            Box(
-                modifier = Modifier
-                    .weight(5f)
-                    .fillMaxHeight()
-                    .background(
-                        Brush.linearGradient(
-                            listOf(EditorialColors.primary, EditorialColors.primaryContainer),
-                        ),
-                    )
-                    .padding(40.dp),
-            ) {
-                Column(
-                    verticalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxHeight(),
-                ) {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Icon(
-                                Icons.Outlined.AccountTree,
-                                contentDescription = null,
-                                tint = EditorialColors.onPrimary,
-                                modifier = Modifier.size(36.dp),
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val compactLayout = maxWidth < CompactLayoutBreakpoint
+            if (!compactLayout) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        modifier = Modifier
+                            .weight(5f)
+                            .fillMaxHeight()
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(EditorialColors.primary, EditorialColors.primaryContainer),
+                                ),
                             )
-                            Text(
-                                text = "THE ENGINEERING EDITORIAL",
-                                color = EditorialColors.onPrimary,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Black,
-                            )
-                        }
-                        Spacer(Modifier.height(40.dp))
-                        Text(
-                            "Master your workflow with architectural precision.",
-                            color = EditorialColors.onPrimary,
-                            style = MaterialTheme.typography.headlineSmall.copy(
-                                color = EditorialColors.onPrimary,
-                                lineHeight = 32.sp,
-                            ),
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        Text(
-                            "A sophisticated interface for managing Azure DevOps Pull Requests, designed for clarity and speed.",
-                            color = EditorialColors.primaryFixed.copy(alpha = 0.85f),
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.width(260.dp),
-                        )
-                    }
-                    Column {
-                        Row(horizontalArrangement = Arrangement.spacedBy((-10).dp)) {
-                            repeat(3) { i ->
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            listOf(
-                                                EditorialColors.primaryFixedDim,
-                                                EditorialColors.primaryFixed,
-                                                EditorialColors.inversePrimary,
-                                            )[i],
-                                        ),
+                            .padding(40.dp),
+                    ) {
+                        Column(
+                            verticalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxHeight(),
+                        ) {
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Icon(
+                                        Icons.Outlined.AccountTree,
+                                        contentDescription = null,
+                                        tint = EditorialColors.onPrimary,
+                                        modifier = Modifier.size(36.dp),
+                                    )
+                                    Text(
+                                        text = "THE ENGINEERING EDITORIAL",
+                                        color = EditorialColors.onPrimary,
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Black,
+                                    )
+                                }
+                                Spacer(Modifier.height(40.dp))
+                                Text(
+                                    "Master your workflow with architectural precision.",
+                                    color = EditorialColors.onPrimary,
+                                    style = MaterialTheme.typography.headlineSmall.copy(
+                                        color = EditorialColors.onPrimary,
+                                        lineHeight = 32.sp,
+                                    ),
+                                    fontSize = 28.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Spacer(Modifier.height(16.dp))
+                                Text(
+                                    "A sophisticated interface for managing Azure DevOps Pull Requests, designed for clarity and speed.",
+                                    color = EditorialColors.primaryFixed.copy(alpha = 0.85f),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.width(260.dp),
+                                )
+                            }
+                            Column {
+                                Row(horizontalArrangement = Arrangement.spacedBy((-10).dp)) {
+                                    repeat(3) { i ->
+                                        Box(
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .clip(CircleShape)
+                                                .background(
+                                                    listOf(
+                                                        EditorialColors.primaryFixedDim,
+                                                        EditorialColors.primaryFixed,
+                                                        EditorialColors.inversePrimary,
+                                                    )[i],
+                                                ),
+                                        )
+                                    }
+                                }
+                                Spacer(Modifier.height(12.dp))
+                                Text(
+                                    "TRUSTED BY SENIOR ENGINEERS",
+                                    color = EditorialColors.primaryFixed,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
                                 )
                             }
                         }
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            "TRUSTED BY SENIOR ENGINEERS",
-                            color = EditorialColors.primaryFixed,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
                     }
+                    LoginFormPane(
+                        modifier = Modifier
+                            .weight(7f)
+                            .fillMaxHeight()
+                            .background(EditorialColors.surfaceContainerLowest)
+                            .verticalScroll(scroll)
+                            .padding(horizontal = 40.dp, vertical = 48.dp),
+                        organization = organization.value,
+                        onOrganizationChange = { organization.value = it },
+                        pat = pat.value,
+                        onPatChange = { pat.value = it },
+                        idleError = idleError,
+                        isWorking = isWorking,
+                        onSubmit = {
+                            scope.launch {
+                                stateMachine.dispatch(
+                                    LoginMachineAction.SubmitPat(
+                                        organization = organization.value,
+                                        pat = pat.value,
+                                    ),
+                                )
+                            }
+                        },
+                        showHelpCard = true,
+                    )
                 }
-            }
-            Column(
-                modifier = Modifier
-                    .weight(7f)
-                    .fillMaxHeight()
-                    .background(EditorialColors.surfaceContainerLowest)
-                    .verticalScroll(scroll)
-                    .padding(horizontal = 40.dp, vertical = 48.dp),
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Text(
-                    "Connect to Azure DevOps",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = EditorialColors.onSurface,
-                )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "Securely authorize your session using a Personal Access Token.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = EditorialColors.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(32.dp))
-                Text("Organization", style = MaterialTheme.typography.titleSmall, color = EditorialColors.onSurface)
-                Spacer(Modifier.height(6.dp))
-                OutlinedTextField(
-                    value = organization.value,
-                    onValueChange = { organization.value = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("e.g. contoso") },
-                    keyboardOptions = KeyboardOptions.Default,
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = EditorialColors.surfaceContainerHighest,
-                        unfocusedContainerColor = EditorialColors.surfaceContainerHighest,
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                    ),
-                )
-                Spacer(Modifier.height(16.dp))
-                Text("Personal Access Token", style = MaterialTheme.typography.titleSmall, color = EditorialColors.onSurface)
-                Spacer(Modifier.height(6.dp))
-                OutlinedTextField(
-                    value = pat.value,
-                    onValueChange = { pat.value = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Paste your PAT here...") },
-                    leadingIcon = { Icon(Icons.Outlined.VpnKey, null, tint = EditorialColors.outline) },
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions.Default,
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = EditorialColors.surfaceContainerHighest,
-                        unfocusedContainerColor = EditorialColors.surfaceContainerHighest,
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                    ),
-                )
-                idleError?.let { message ->
-                    Spacer(Modifier.height(8.dp))
-                    LoginErrorView(message = message)
-                }
-                Spacer(Modifier.height(24.dp))
-                Column(
+            } else {
+                LoginFormPane(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(EditorialColors.surfaceContainer)
-                        .padding(20.dp),
-                ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Icon(Icons.Outlined.Info, null, tint = EditorialColors.primary)
-                        Column {
-                            Text("How to generate a PAT", style = MaterialTheme.typography.titleSmall)
-                            Spacer(Modifier.height(8.dp))
-                            PatStep(1, "Go to User Settings in your ADO portal.")
-                            PatStep(2, "Select Personal access tokens.")
-                            PatStep(3, "Create a new token with Code (Read & Write) scopes.")
-                        }
-                    }
-                }
-                Spacer(Modifier.height(28.dp))
-                Button(
-                    onClick = {
+                        .fillMaxSize()
+                        .background(EditorialColors.surfaceContainerLowest)
+                        .verticalScroll(scroll)
+                        .padding(horizontal = 20.dp, vertical = 24.dp),
+                    organization = organization.value,
+                    onOrganizationChange = { organization.value = it },
+                    pat = pat.value,
+                    onPatChange = { pat.value = it },
+                    idleError = idleError,
+                    isWorking = isWorking,
+                    onSubmit = {
                         scope.launch {
                             stateMachine.dispatch(
                                 LoginMachineAction.SubmitPat(
@@ -260,66 +220,178 @@ fun LoginScreen(
                             )
                         }
                     },
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    enabled = !isWorking && organization.value.isNotBlank() && pat.value.isNotBlank(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = EditorialColors.primary,
-                        contentColor = EditorialColors.onPrimary,
-                    ),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                    ) {
-                        if (isWorking) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(22.dp),
-                                strokeWidth = 2.dp,
-                                color = EditorialColors.onPrimary,
-                            )
-                            Spacer(Modifier.width(12.dp))
-                        }
-                        Text("Connect to The Ledger", fontWeight = FontWeight.Bold)
-                        if (!isWorking) {
-                            Spacer(Modifier.width(8.dp))
-                            Icon(Icons.Outlined.ArrowForward, contentDescription = null)
-                        }
+                    showHelpCard = false,
+                    includeBrandHeader = true,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoginFormPane(
+    modifier: Modifier,
+    organization: String,
+    onOrganizationChange: (String) -> Unit,
+    pat: String,
+    onPatChange: (String) -> Unit,
+    idleError: String?,
+    isWorking: Boolean,
+    onSubmit: () -> Unit,
+    showHelpCard: Boolean,
+    includeBrandHeader: Boolean = false,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        if (includeBrandHeader) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Outlined.AccountTree, contentDescription = null, tint = EditorialColors.primary)
+                Text(
+                    "The Architectural Ledger",
+                    color = EditorialColors.onSurface,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+            }
+            Spacer(Modifier.height(20.dp))
+        }
+        Text(
+            "Connect to Azure DevOps",
+            style = MaterialTheme.typography.headlineSmall,
+            color = EditorialColors.onSurface,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Securely authorize your session using a Personal Access Token.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = EditorialColors.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(32.dp))
+        Text("Organization", style = MaterialTheme.typography.titleSmall, color = EditorialColors.onSurface)
+        Spacer(Modifier.height(6.dp))
+        OutlinedTextField(
+            value = organization,
+            onValueChange = onOrganizationChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("e.g. contoso") },
+            keyboardOptions = KeyboardOptions.Default,
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = EditorialColors.surfaceContainerHighest,
+                unfocusedContainerColor = EditorialColors.surfaceContainerHighest,
+                focusedBorderColor = Color.Transparent,
+                unfocusedBorderColor = Color.Transparent,
+            ),
+        )
+        Spacer(Modifier.height(16.dp))
+        Text("Personal Access Token", style = MaterialTheme.typography.titleSmall, color = EditorialColors.onSurface)
+        Spacer(Modifier.height(6.dp))
+        OutlinedTextField(
+            value = pat,
+            onValueChange = onPatChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Paste your PAT here...") },
+            leadingIcon = { Icon(Icons.Outlined.VpnKey, null, tint = EditorialColors.outline) },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions.Default,
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = EditorialColors.surfaceContainerHighest,
+                unfocusedContainerColor = EditorialColors.surfaceContainerHighest,
+                focusedBorderColor = Color.Transparent,
+                unfocusedBorderColor = Color.Transparent,
+            ),
+        )
+        idleError?.let { message ->
+            Spacer(Modifier.height(8.dp))
+            LoginErrorView(message = message)
+        }
+        if (showHelpCard) {
+            Spacer(Modifier.height(24.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(EditorialColors.surfaceContainer)
+                    .padding(20.dp),
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Icon(Icons.Outlined.Info, null, tint = EditorialColors.primary)
+                    Column {
+                        Text("How to generate a PAT", style = MaterialTheme.typography.titleSmall)
+                        Spacer(Modifier.height(8.dp))
+                        PatStep(1, "Go to User Settings in your ADO portal.")
+                        PatStep(2, "Select Personal access tokens.")
+                        PatStep(3, "Create a new token with Code (Read & Write) scopes.")
                     }
                 }
-                Spacer(Modifier.height(32.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Icon(
-                            Icons.Outlined.Shield,
-                            null,
-                            tint = EditorialColors.outline.copy(alpha = 0.45f),
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Text(
-                            "ENTERPRISE ENCRYPTION ACTIVE",
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = EditorialColors.outline.copy(alpha = 0.45f),
-                        )
-                    }
-                    TextButton(onClick = { }) {
-                        Text(
-                            "NEED HELP?",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = EditorialColors.primary,
-                            textDecoration = TextDecoration.Underline,
-                        )
-                    }
+            }
+        }
+        Spacer(Modifier.height(28.dp))
+        Button(
+            onClick = onSubmit,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            enabled = !isWorking && organization.isNotBlank() && pat.isNotBlank(),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = EditorialColors.primary,
+                contentColor = EditorialColors.onPrimary,
+            ),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                if (isWorking) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.dp,
+                        color = EditorialColors.onPrimary,
+                    )
+                    Spacer(Modifier.width(12.dp))
                 }
+                Text("Connect to The Ledger", fontWeight = FontWeight.Bold)
+                if (!isWorking) {
+                    Spacer(Modifier.width(8.dp))
+                    Icon(Icons.Outlined.ArrowForward, contentDescription = null)
+                }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(
+                    Icons.Outlined.Shield,
+                    null,
+                    tint = EditorialColors.outline.copy(alpha = 0.45f),
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    "ENTERPRISE ENCRYPTION ACTIVE",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = EditorialColors.outline.copy(alpha = 0.45f),
+                )
+            }
+            TextButton(onClick = { }) {
+                Text(
+                    "NEED HELP?",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = EditorialColors.primary,
+                    textDecoration = TextDecoration.Underline,
+                )
             }
         }
     }

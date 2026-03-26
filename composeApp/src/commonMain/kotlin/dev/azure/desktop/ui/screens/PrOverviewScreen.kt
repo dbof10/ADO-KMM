@@ -3,6 +3,7 @@ package dev.azure.desktop.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -63,6 +64,8 @@ import dev.azure.desktop.theme.EditorialColors
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 
+private val PrOverviewCompactBreakpoint = 900.dp
+
 @Composable
 fun PrOverviewScreen(
     detail: PullRequestDetail,
@@ -75,14 +78,20 @@ fun PrOverviewScreen(
 ) {
     val summary = detail.summary
     var selectedTab by remember { mutableIntStateOf(0) }
-    Box(modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(EditorialColors.surfaceContainerLow),
-        ) {
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxSize()
+            .background(EditorialColors.surfaceContainerLow),
+    ) {
+        val compactLayout = maxWidth < PrOverviewCompactBreakpoint
+        Column(modifier = Modifier.fillMaxSize()) {
             Column(
-                Modifier.padding(start = 32.dp, top = 32.dp, end = 32.dp, bottom = 8.dp),
+                Modifier.padding(
+                    start = if (compactLayout) 16.dp else 32.dp,
+                    top = if (compactLayout) 16.dp else 32.dp,
+                    end = if (compactLayout) 16.dp else 32.dp,
+                    bottom = 8.dp,
+                ),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Surface(
@@ -153,7 +162,7 @@ fun PrOverviewScreen(
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = EditorialColors.surfaceContainerLow,
-                modifier = Modifier.padding(horizontal = 32.dp),
+                modifier = Modifier.padding(horizontal = if (compactLayout) 0.dp else 32.dp),
                 indicator = { tabPositions ->
                     TabRowDefaults.SecondaryIndicator(
                         Modifier.tabIndicatorOffset(tabPositions[selectedTab]).height(2.dp),
@@ -181,44 +190,35 @@ fun PrOverviewScreen(
                             .weight(1f)
                             .fillMaxWidth()
                             .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 32.dp)
-                            .padding(bottom = 32.dp),
+                            .padding(horizontal = if (compactLayout) 16.dp else 32.dp)
+                            .padding(bottom = if (compactLayout) 16.dp else 32.dp),
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(24.dp),
-                        ) {
-                            Column(Modifier.weight(2f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                                Card(
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = CardDefaults.cardColors(containerColor = EditorialColors.surfaceContainerLowest),
-                                    elevation = CardDefaults.cardElevation(2.dp),
-                                ) {
-                                    Column(Modifier.padding(24.dp)) {
-                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Text("DESCRIPTION", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                                            TextButton(onClick = { }) { Text("Edit", color = EditorialColors.primary, fontWeight = FontWeight.SemiBold) }
-                                        }
-                                        Spacer(Modifier.height(8.dp))
-                                        Text(
-                                            detail.description?.takeIf { it.isNotBlank() } ?: "No description was provided.",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = EditorialColors.onSurfaceVariant,
-                                        )
-                                    }
-                                }
+                        if (compactLayout) {
+                            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                DescriptionCard(detail.description, compactLayout = true)
+                                ReviewersCard(detail.reviewers)
                                 ActivityTimeline(detail.timeline)
                             }
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                                ReviewersCard(detail.reviewers)
-                                LinkedItemsCard(
-                                    linkedWorkItems = detail.linkedWorkItems,
-                                    checks = detail.checks,
-                                )
-                                StatsCard(linesAdded = detail.linesAdded, linesRemoved = detail.linesRemoved)
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                            ) {
+                                Column(Modifier.weight(2f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                                    DescriptionCard(detail.description, compactLayout = false)
+                                    ActivityTimeline(detail.timeline)
+                                }
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                                    ReviewersCard(detail.reviewers)
+                                    LinkedItemsCard(
+                                        linkedWorkItems = detail.linkedWorkItems,
+                                        checks = detail.checks,
+                                    )
+                                    StatsCard(linesAdded = detail.linesAdded, linesRemoved = detail.linesRemoved)
+                                }
                             }
+                            Spacer(Modifier.height(80.dp))
                         }
-                        Spacer(Modifier.height(80.dp))
                     }
                 1 ->
                     Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -228,6 +228,30 @@ fun PrOverviewScreen(
                         )
                     }
             }
+        }
+    }
+}
+
+@Composable
+private fun DescriptionCard(description: String?, compactLayout: Boolean) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = EditorialColors.surfaceContainerLowest),
+        elevation = CardDefaults.cardElevation(2.dp),
+    ) {
+        Column(Modifier.padding(if (compactLayout) 16.dp else 24.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("DESCRIPTION", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                if (!compactLayout) {
+                    TextButton(onClick = { }) { Text("Edit", color = EditorialColors.primary, fontWeight = FontWeight.SemiBold) }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                description?.takeIf { it.isNotBlank() } ?: "No description was provided.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = EditorialColors.onSurfaceVariant,
+            )
         }
     }
 }
