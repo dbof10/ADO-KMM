@@ -101,6 +101,9 @@ android {
 compose.desktop {
     application {
         mainClass = "dev.azure.desktop.MainKt"
+        buildTypes.release.proguard {
+            isEnabled.set(false)
+        }
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "ADO Desktop"

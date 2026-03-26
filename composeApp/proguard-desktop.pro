@@ -1,0 +1,4 @@
+-dontwarn io.ktor.network.sockets.**
+-dontwarn io.ktor.utils.io.jvm.javaio.**
+-dontwarn android.util.Log
+-ignorewarnings
