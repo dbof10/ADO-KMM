@@ -193,7 +193,11 @@ internal fun PrListScreenContent(
                     ) {
                         LazyColumn(Modifier.fillMaxWidth()) {
                             items(current.items, key = { it.id }) { item ->
-                                PullRequestRow(item = item, onClick = { onOpenPullRequest(item) })
+                                PullRequestRow(
+                                    item = item,
+                                    compactLayout = compactLayout,
+                                    onClick = { onOpenPullRequest(item) },
+                                )
                             }
                         }
                     }
@@ -394,7 +398,11 @@ private fun ProjectDropdown(
 }
 
 @Composable
-private fun PullRequestRow(item: PullRequestSummary, onClick: () -> Unit) {
+private fun PullRequestRow(
+    item: PullRequestSummary,
+    compactLayout: Boolean,
+    onClick: () -> Unit,
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -403,36 +411,73 @@ private fun PullRequestRow(item: PullRequestSummary, onClick: () -> Unit) {
         colors = CardDefaults.cardColors(containerColor = EditorialColors.surface),
         shape = RoundedCornerShape(10.dp),
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
+        if (compactLayout) {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(4.dp))
                 Text(
                     "${item.creatorDisplayName} • ${item.projectName} → ${item.targetRefName.substringAfterLast("/")}",
                     style = MaterialTheme.typography.bodySmall,
                     color = EditorialColors.onSurfaceVariant,
                 )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = EditorialColors.primaryFixed,
+                    ) {
+                        Text(
+                            item.status.uppercase(),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = EditorialColors.onPrimaryFixed,
+                        )
+                    }
+                    Button(
+                        onClick = onClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = EditorialColors.primaryContainer),
+                    ) {
+                        Text("Open")
+                    }
+                }
             }
-            Surface(
-                shape = RoundedCornerShape(999.dp),
-                color = EditorialColors.primaryFixed,
+        } else {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    item.status.uppercase(),
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = EditorialColors.onPrimaryFixed,
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Button(
-                onClick = onClick,
-                colors = ButtonDefaults.buttonColors(containerColor = EditorialColors.primaryContainer),
-            ) {
-                Text("Open")
+                Column(Modifier.weight(1f)) {
+                    Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "${item.creatorDisplayName} • ${item.projectName} → ${item.targetRefName.substringAfterLast("/")}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = EditorialColors.onSurfaceVariant,
+                    )
+                }
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = EditorialColors.primaryFixed,
+                ) {
+                    Text(
+                        item.status.uppercase(),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = EditorialColors.onPrimaryFixed,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Button(
+                    onClick = onClick,
+                    colors = ButtonDefaults.buttonColors(containerColor = EditorialColors.primaryContainer),
+                ) {
+                    Text("Open")
+                }
             }
         }
     }

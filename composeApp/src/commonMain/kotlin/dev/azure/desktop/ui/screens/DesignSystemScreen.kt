@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,6 +27,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,14 +47,23 @@ import dev.azure.desktop.ui.adaptive.layoutClassForWidth
 @Composable
 fun DesignSystemScreen(
     onBack: () -> Unit,
+    onClearCache: () -> Result<Unit>,
     modifier: Modifier = Modifier,
 ) {
     androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxSize()) {
         val compactLayout = layoutClassForWidth(maxWidth) == LayoutClass.Compact
         if (compactLayout) {
-            DesignSystemScreenMobile(onBack = onBack, modifier = Modifier.fillMaxSize())
+            DesignSystemScreenMobile(
+                onBack = onBack,
+                onClearCache = onClearCache,
+                modifier = Modifier.fillMaxSize(),
+            )
         } else {
-            DesignSystemScreenDesktop(onBack = onBack, modifier = Modifier.fillMaxSize())
+            DesignSystemScreenDesktop(
+                onBack = onBack,
+                onClearCache = onClearCache,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }
@@ -60,9 +72,11 @@ fun DesignSystemScreen(
 @Composable
 internal fun DesignSystemScreenContent(
     onBack: () -> Unit,
+    onClearCache: () -> Result<Unit>,
     modifier: Modifier = Modifier,
 ) {
     val scroll = rememberScrollState()
+    var cacheClearMessage by remember { mutableStateOf<String?>(null) }
     Column(
         modifier
             .fillMaxSize()
@@ -160,6 +174,27 @@ internal fun DesignSystemScreenContent(
             style = MaterialTheme.typography.bodySmall,
             color = EditorialColors.onSurfaceVariant,
         )
+        Spacer(Modifier.height(24.dp))
+        OutlinedButton(
+            onClick = {
+                cacheClearMessage = onClearCache().fold(
+                    onSuccess = { "Local cache cleared. Login credentials were kept." },
+                    onFailure = { "Failed to clear cache: ${it.message ?: "Unknown error"}" },
+                )
+            },
+            shape = RoundedCornerShape(10.dp),
+            border = BorderStroke(1.dp, EditorialColors.error.copy(alpha = 0.4f)),
+        ) {
+            Text("Clear cache", color = EditorialColors.error, fontWeight = FontWeight.SemiBold)
+        }
+        cacheClearMessage?.let { message ->
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = EditorialColors.onSurfaceVariant,
+            )
+        }
     }
 }
 

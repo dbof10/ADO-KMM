@@ -27,5 +27,6 @@ internal fun ReleaseListScreenDesktop(
         getReleaseDefinition = getReleaseDefinition,
         createRelease = createRelease,
         scope = scope,
+        compactLayout = false,
     )
 }

@@ -5,9 +5,12 @@ import dev.azure.desktop.domain.auth.VerifyAndStorePatUseCase
 import dev.azure.desktop.domain.pr.FindPullRequestSummaryByIdUseCase
 import dev.azure.desktop.domain.pr.GetActivePullRequestsUseCase
 import dev.azure.desktop.domain.pr.GetMyPullRequestsUseCase
+import dev.azure.desktop.domain.pr.GetMostSelectedProjectUseCase
+import dev.azure.desktop.domain.pr.ClearProjectSelectionCountsUseCase
 import dev.azure.desktop.domain.pr.GetPullRequestDetailUseCase
 import dev.azure.desktop.domain.pr.GetPullRequestFileDiffUseCase
 import dev.azure.desktop.domain.pr.GetPullRequestSummaryByIdUseCase
+import dev.azure.desktop.domain.pr.IncrementProjectSelectionUseCase
 import dev.azure.desktop.domain.pr.ListProjectsUseCase
 import dev.azure.desktop.domain.pr.PullRequestChange
 import dev.azure.desktop.domain.pr.SetMyPullRequestVoteUseCase
@@ -31,6 +34,9 @@ interface PullRequestBridge {
     val getActivePullRequestsUseCase: GetActivePullRequestsUseCase
     val findPullRequestSummaryByIdUseCase: FindPullRequestSummaryByIdUseCase
     val getPullRequestSummaryByIdUseCase: GetPullRequestSummaryByIdUseCase
+    val getMostSelectedProjectUseCase: GetMostSelectedProjectUseCase
+    val incrementProjectSelectionUseCase: IncrementProjectSelectionUseCase
+    val clearProjectSelectionCountsUseCase: ClearProjectSelectionCountsUseCase
     val getPullRequestDetailUseCase: GetPullRequestDetailUseCase
     val setMyPullRequestVoteUseCase: SetMyPullRequestVoteUseCase
     val getPullRequestFileDiffUseCase: GetPullRequestFileDiffUseCase

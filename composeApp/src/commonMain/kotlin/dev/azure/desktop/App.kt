@@ -68,6 +68,8 @@ fun App() {
                 getActivePullRequestsUseCase = pullRequestBridge.getActivePullRequestsUseCase,
                 findPullRequestSummaryByIdUseCase = pullRequestBridge.findPullRequestSummaryByIdUseCase,
                 getPullRequestSummaryByIdUseCase = pullRequestBridge.getPullRequestSummaryByIdUseCase,
+                getMostSelectedProjectUseCase = pullRequestBridge.getMostSelectedProjectUseCase,
+                incrementProjectSelectionUseCase = pullRequestBridge.incrementProjectSelectionUseCase,
             )
         }
         val prDetailStateMachine = remember(selectedPullRequest, organization, loginMachineEpoch) {
@@ -107,6 +109,8 @@ fun App() {
                     listProjectsUseCase = pullRequestBridge.listProjectsUseCase,
                     listReleaseDefinitionsUseCase = releaseBridge.listReleaseDefinitionsUseCase,
                     listReleasesForDefinitionUseCase = releaseBridge.listReleasesForDefinitionUseCase,
+                    getMostSelectedProjectUseCase = pullRequestBridge.getMostSelectedProjectUseCase,
+                    incrementProjectSelectionUseCase = pullRequestBridge.incrementProjectSelectionUseCase,
                 )
             } else {
                 null
@@ -335,6 +339,7 @@ fun App() {
                     content = {
                         DesignSystemScreen(
                             onBack = { screen.value = AppScreen.PrList },
+                            onClearCache = { pullRequestBridge.clearProjectSelectionCountsUseCase() },
                             modifier = Modifier.fillMaxSize(),
                         )
                     },

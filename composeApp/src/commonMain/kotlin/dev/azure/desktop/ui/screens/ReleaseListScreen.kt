@@ -114,6 +114,7 @@ internal fun ReleaseListScreenContent(
     getReleaseDefinition: suspend (String, Int) -> Result<ReleaseDefinitionDetail>,
     createRelease: suspend (CreateReleaseParams) -> Result<CreatedRelease>,
     scope: kotlinx.coroutines.CoroutineScope,
+    compactLayout: Boolean,
 ) {
     Surface(Modifier.fillMaxSize(), color = EditorialColors.surfaceContainerLow) {
         when (val current = listState) {
@@ -151,12 +152,13 @@ internal fun ReleaseListScreenContent(
                     onOpenRelease = onOpenRelease,
                     getReleaseDefinition = getReleaseDefinition,
                     createRelease = createRelease,
+                    compactLayout = compactLayout,
                 )
 
             is ReleaseListState.DefinitionsError ->
-                Column(Modifier.fillMaxSize().padding(24.dp)) {
+                Column(Modifier.fillMaxSize().padding(if (compactLayout) 16.dp else 24.dp)) {
                     ProjectStrip(
-                        compactLayout = false,
+                        compactLayout = compactLayout,
                         projects = current.projects,
                         selectedProjectName = current.selectedProjectName,
                         onSelectProject = { scope.launch { stateMachine.dispatch(ReleaseListAction.SelectProject(it)) } },
@@ -233,13 +235,14 @@ internal fun ReleaseListScreenContent(
                     onOpenRelease = onOpenRelease,
                     getReleaseDefinition = getReleaseDefinition,
                     createRelease = createRelease,
+                    compactLayout = compactLayout,
                 )
             }
 
             is ReleaseListState.ReleasesError ->
-                Column(Modifier.fillMaxSize().padding(24.dp)) {
+                Column(Modifier.fillMaxSize().padding(if (compactLayout) 16.dp else 24.dp)) {
                     ProjectStrip(
-                        compactLayout = false,
+                        compactLayout = compactLayout,
                         projects = current.projects,
                         selectedProjectName = current.selectedProjectName,
                         onSelectProject = { scope.launch { stateMachine.dispatch(ReleaseListAction.SelectProject(it)) } },
@@ -247,6 +250,7 @@ internal fun ReleaseListScreenContent(
                     )
                     Spacer(Modifier.height(16.dp))
                     DefinitionSidebarOnly(
+                        compactLayout = compactLayout,
                         definitions = current.definitions,
                         selectedDefinitionId = current.selectedDefinitionId,
                         onSelectDefinition = {
@@ -290,11 +294,11 @@ private fun ReleaseListLayout(
     onOpenRelease: (ReleaseSummary) -> Unit,
     getReleaseDefinition: suspend (String, Int) -> Result<ReleaseDefinitionDetail>,
     createRelease: suspend (CreateReleaseParams) -> Result<CreatedRelease>,
+    compactLayout: Boolean,
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
 
-    BoxWithConstraints(Modifier.fillMaxSize().padding(24.dp)) {
-        val compactLayout = layoutClassForWidth(maxWidth) == LayoutClass.Compact
+    BoxWithConstraints(Modifier.fillMaxSize().padding(if (compactLayout) 16.dp else 24.dp)) {
         Column(Modifier.fillMaxSize()) {
             ProjectStrip(
                 compactLayout = compactLayout,
@@ -331,6 +335,7 @@ private fun ReleaseListLayout(
                         releases = releases,
                         busy = listBusy,
                         onOpenRelease = onOpenRelease,
+                        compactLayout = compactLayout,
                     )
                 }
             } else {
@@ -361,6 +366,7 @@ private fun ReleaseListLayout(
                             releases = releases,
                             busy = listBusy,
                             onOpenRelease = onOpenRelease,
+                            compactLayout = compactLayout,
                         )
                     }
                 }
@@ -435,13 +441,19 @@ private fun ProjectStrip(
 
 @Composable
 private fun DefinitionSidebarOnly(
+    compactLayout: Boolean,
     definitions: List<ReleaseDefinitionSummary>,
     selectedDefinitionId: Int,
     onSelectDefinition: (Int) -> Unit,
 ) {
     Row(Modifier.fillMaxWidth()) {
         Surface(
-            Modifier.width(320.dp).height(400.dp),
+            modifier =
+                if (compactLayout) {
+                    Modifier.fillMaxWidth().height(280.dp)
+                } else {
+                    Modifier.width(320.dp).height(400.dp)
+                },
             color = EditorialColors.surfaceContainerLowest,
             shape = RoundedCornerShape(12.dp),
         ) {
@@ -569,6 +581,7 @@ private fun ReleaseMainPanel(
     releases: List<ReleaseSummary>,
     busy: Boolean,
     onOpenRelease: (ReleaseSummary) -> Unit,
+    compactLayout: Boolean,
 ) {
     var mainTab by remember { mutableIntStateOf(0) }
     val defName = definitions.firstOrNull { it.id == selectedDefinitionId }?.name.orEmpty()
@@ -610,7 +623,11 @@ private fun ReleaseMainPanel(
                         Text("No releases yet.", color = EditorialColors.onSurfaceVariant)
                     }
                 } else {
-                    ReleaseTable(releases = releases, onRowClick = onOpenRelease)
+                    ReleaseTable(
+                        releases = releases,
+                        onRowClick = onOpenRelease,
+                        compactLayout = compactLayout,
+                    )
                 }
             1 ->
                 if (busy) {
@@ -622,7 +639,11 @@ private fun ReleaseMainPanel(
                         Text("No deployments — no releases loaded.", color = EditorialColors.onSurfaceVariant)
                     }
                 } else {
-                    DeploymentsFromReleasesTable(releases = releases, onOpenRelease = onOpenRelease)
+                    DeploymentsFromReleasesTable(
+                        releases = releases,
+                        onOpenRelease = onOpenRelease,
+                        compactLayout = compactLayout,
+                    )
                 }
         }
     }
@@ -632,47 +653,71 @@ private fun ReleaseMainPanel(
 private fun ReleaseTable(
     releases: List<ReleaseSummary>,
     onRowClick: (ReleaseSummary) -> Unit,
+    compactLayout: Boolean,
 ) {
     Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Releases", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1.2f))
-            Text("Created", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(0.5f))
-            Text("Stages", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1.3f))
+        if (!compactLayout) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Releases", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1.2f))
+                Text("Created", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(0.5f))
+                Text("Stages", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1.3f))
+            }
+            HorizontalDivider(color = EditorialColors.outlineVariant.copy(alpha = 0.4f))
         }
-        HorizontalDivider(color = EditorialColors.outlineVariant.copy(alpha = 0.4f))
         LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             items(releases, key = { it.id }) { r ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { onRowClick(r) }
-                        .background(EditorialColors.surface.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 12.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1.2f)) {
+                if (compactLayout) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onRowClick(r) }
+                            .background(EditorialColors.surface.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
                         Text(r.name, color = EditorialColors.primary, fontWeight = FontWeight.Medium)
-                        val sub =
-                            buildString {
-                                r.commitShort?.let { append(it); append(" • ") }
-                                r.branchLabel?.let { append(it) }
-                            }
-                        if (sub.isNotBlank()) {
-                            Text(sub, style = MaterialTheme.typography.bodySmall, color = EditorialColors.onSurfaceVariant)
+                        Text(
+                            formatReleaseTime(r.createdOnIso),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = EditorialColors.onSurfaceVariant,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            r.stages.take(2).forEach { StageMiniPill(it) }
                         }
                     }
-                    Text(
-                        formatReleaseTime(r.createdOnIso),
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.weight(0.5f),
-                    )
-                    Row(Modifier.weight(1.3f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        r.stages.take(6).forEach { StageMiniPill(it) }
+                } else {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onRowClick(r) }
+                            .background(EditorialColors.surface.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1.2f)) {
+                            Text(r.name, color = EditorialColors.primary, fontWeight = FontWeight.Medium)
+                            val sub =
+                                buildString {
+                                    r.commitShort?.let { append(it); append(" • ") }
+                                    r.branchLabel?.let { append(it) }
+                                }
+                            if (sub.isNotBlank()) {
+                                Text(sub, style = MaterialTheme.typography.bodySmall, color = EditorialColors.onSurfaceVariant)
+                            }
+                        }
+                        Text(
+                            formatReleaseTime(r.createdOnIso),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(0.5f),
+                        )
+                        Row(Modifier.weight(1.3f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            r.stages.take(6).forEach { StageMiniPill(it) }
+                        }
                     }
                 }
             }
@@ -716,6 +761,7 @@ private fun StageMiniPill(pill: ReleaseStagePill) {
 private fun DeploymentsFromReleasesTable(
     releases: List<ReleaseSummary>,
     onOpenRelease: (ReleaseSummary) -> Unit,
+    compactLayout: Boolean,
 ) {
     val rows =
         remember(releases) {
@@ -726,29 +772,46 @@ private fun DeploymentsFromReleasesTable(
             }
         }
     Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Release", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            Text("Environment", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(0.9f))
-            Text("State", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(0.6f))
+        if (!compactLayout) {
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Release", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text("Environment", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(0.9f))
+                Text("State", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(0.6f))
+            }
+            HorizontalDivider(color = EditorialColors.outlineVariant.copy(alpha = 0.4f))
         }
-        HorizontalDivider(color = EditorialColors.outlineVariant.copy(alpha = 0.4f))
         LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             items(rows.size, key = { idx -> "${rows[idx].first.id}-${rows[idx].second}-$idx" }) { idx ->
                 val (rel, envName, st) = rows[idx]
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { onOpenRelease(rel) }
-                        .background(EditorialColors.surface.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(rel.name, color = EditorialColors.primary, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(envName, modifier = Modifier.weight(0.9f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(st.name, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.6f))
+                if (compactLayout) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onOpenRelease(rel) }
+                            .background(EditorialColors.surface.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(rel.name, color = EditorialColors.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(envName, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(st.name, style = MaterialTheme.typography.bodySmall, color = EditorialColors.onSurfaceVariant)
+                    }
+                } else {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onOpenRelease(rel) }
+                            .background(EditorialColors.surface.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(rel.name, color = EditorialColors.primary, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(envName, modifier = Modifier.weight(0.9f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(st.name, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.6f))
+                    }
                 }
             }
         }
@@ -756,4 +819,10 @@ private fun DeploymentsFromReleasesTable(
 }
 
 private fun formatReleaseTime(iso: String?): String =
-    iso?.replace('T', ' ')?.substringBefore('.').orEmpty().ifBlank { "—" }
+    iso
+        ?.replace('T', ' ')
+        ?.substringBefore('.')
+        ?.replace('Z', ' ')
+        ?.trim()
+        .orEmpty()
+        .ifBlank { "—" }

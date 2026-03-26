@@ -8,7 +8,12 @@ import androidx.compose.ui.Modifier
 @Composable
 internal fun DesignSystemScreenDesktop(
     onBack: () -> Unit,
+    onClearCache: () -> Result<Unit>,
     modifier: Modifier = Modifier,
 ) {
-    DesignSystemScreenContent(onBack = onBack, modifier = modifier)
+    DesignSystemScreenContent(
+        onBack = onBack,
+        onClearCache = onClearCache,
+        modifier = modifier,
+    )
 }

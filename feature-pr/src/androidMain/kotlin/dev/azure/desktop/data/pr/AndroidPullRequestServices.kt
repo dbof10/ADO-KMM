@@ -1,8 +1,12 @@
 package dev.azure.desktop.data.pr
 
 import dev.azure.desktop.data.auth.AndroidAuthServices
+import dev.azure.desktop.data.auth.AndroidContextHolder
+import dev.azure.desktop.domain.pr.ClearProjectSelectionCountsUseCase
 import dev.azure.desktop.domain.pr.FindPullRequestSummaryByIdUseCase
+import dev.azure.desktop.domain.pr.GetMostSelectedProjectUseCase
 import dev.azure.desktop.domain.pr.GetActivePullRequestsUseCase
+import dev.azure.desktop.domain.pr.IncrementProjectSelectionUseCase
 import dev.azure.desktop.domain.pr.GetMyPullRequestsUseCase
 import dev.azure.desktop.domain.pr.GetPullRequestDetailUseCase
 import dev.azure.desktop.domain.pr.GetPullRequestFileDiffUseCase
@@ -20,6 +24,22 @@ object AndroidPullRequestServices {
     }
 
     val listProjectsUseCase by lazy { ListProjectsUseCase(repository) }
+
+    private val projectSelectionCountStorage by lazy {
+        SharedPreferencesProjectSelectionCountStorage(AndroidContextHolder.get())
+    }
+
+    val getMostSelectedProjectUseCase by lazy {
+        GetMostSelectedProjectUseCase(projectSelectionCountStorage)
+    }
+
+    val incrementProjectSelectionUseCase by lazy {
+        IncrementProjectSelectionUseCase(projectSelectionCountStorage)
+    }
+
+    val clearProjectSelectionCountsUseCase by lazy {
+        ClearProjectSelectionCountsUseCase(projectSelectionCountStorage)
+    }
 
     val getMyPullRequestsUseCase by lazy { GetMyPullRequestsUseCase(repository) }
 

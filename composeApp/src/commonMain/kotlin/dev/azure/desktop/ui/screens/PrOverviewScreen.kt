@@ -153,47 +153,97 @@ internal fun PrOverviewScreenContent(
                             fontSize = 10.sp,
                         )
                     }
-                    Text("PR #${summary.id}", style = MaterialTheme.typography.bodySmall, color = EditorialColors.outline, fontWeight = FontWeight.Medium)
+                    Text(
+                        "PR #${summary.id}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = EditorialColors.outline,
+                        fontWeight = FontWeight.Medium,
+                    )
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(
                     summary.title,
-                    style = MaterialTheme.typography.headlineSmall.copy(fontSize = 28.sp, fontWeight = FontWeight.ExtraBold),
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontSize = if (compactLayout) 22.sp else 28.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                    ),
                     color = EditorialColors.onSurface,
                 )
                 Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .size(20.dp)
-                            .clip(CircleShape)
-                            .background(EditorialColors.primaryContainer),
-                    )
-                    Text(summary.creatorDisplayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        "wants to merge into ${summary.targetRefName.substringAfterLast("/")}" +
-                            " from ${summary.sourceRefName.substringAfterLast("/")}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = EditorialColors.onSurfaceVariant,
-                    )
+                if (compactLayout) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clip(CircleShape)
+                                    .background(EditorialColors.primaryContainer),
+                            )
+                            Text(summary.creatorDisplayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        }
+                        Text(
+                            "wants to merge into ${summary.targetRefName.substringAfterLast("/")}" +
+                                " from ${summary.sourceRefName.substringAfterLast("/")}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = EditorialColors.onSurfaceVariant,
+                        )
+                    }
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clip(CircleShape)
+                                .background(EditorialColors.primaryContainer),
+                        )
+                        Text(summary.creatorDisplayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "wants to merge into ${summary.targetRefName.substringAfterLast("/")}" +
+                                " from ${summary.sourceRefName.substringAfterLast("/")}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = EditorialColors.onSurfaceVariant,
+                        )
+                    }
                 }
                 Spacer(Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (compactLayout) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
                         OutlinedButton(
                             onClick = onReject,
                             enabled = !isVoting,
+                            modifier = Modifier.weight(1f),
                         ) {
                             Text("Reject")
                         }
                         Button(
                             onClick = onApprove,
                             enabled = !isVoting,
+                            modifier = Modifier.weight(1f),
                         ) {
                             Text("Approve")
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedButton(
+                                onClick = onReject,
+                                enabled = !isVoting,
+                            ) {
+                                Text("Reject")
+                            }
+                            Button(
+                                onClick = onApprove,
+                                enabled = !isVoting,
+                            ) {
+                                Text("Approve")
+                            }
                         }
                     }
                 }
@@ -244,7 +294,7 @@ internal fun PrOverviewScreenContent(
                             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                                 DescriptionCard(detail.description, compactLayout = true)
                                 ReviewersCard(detail.reviewers)
-                                ActivityTimeline(detail.timeline)
+                                ActivityTimeline(detail.timeline, compactLayout = true)
                             }
                         } else {
                             Row(
@@ -253,7 +303,7 @@ internal fun PrOverviewScreenContent(
                             ) {
                                 Column(Modifier.weight(2f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                                     DescriptionCard(detail.description, compactLayout = false)
-                                    ActivityTimeline(detail.timeline)
+                                    ActivityTimeline(detail.timeline, compactLayout = false)
                                 }
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                                     ReviewersCard(detail.reviewers)
@@ -303,7 +353,7 @@ private fun DescriptionCard(description: String?, compactLayout: Boolean) {
 }
 
 @Composable
-private fun ActivityTimeline(items: List<PullRequestTimelineItem>) {
+private fun ActivityTimeline(items: List<PullRequestTimelineItem>, compactLayout: Boolean) {
     Column {
         Text("ACTIVITY TIMELINE", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp))
         Spacer(Modifier.height(12.dp))
@@ -318,9 +368,9 @@ private fun ActivityTimeline(items: List<PullRequestTimelineItem>) {
             } else {
                 items.take(25).forEach { item ->
                     when (item) {
-                        is PullRequestTimelineItem.Comment -> TimelineComment(item)
-                        is PullRequestTimelineItem.Approval -> TimelineApproval(item)
-                        is PullRequestTimelineItem.Commit -> TimelineCommit(item)
+                        is PullRequestTimelineItem.Comment -> TimelineComment(item, compactLayout)
+                        is PullRequestTimelineItem.Approval -> TimelineApproval(item, compactLayout)
+                        is PullRequestTimelineItem.Commit -> TimelineCommit(item, compactLayout)
                     }
                 }
             }
@@ -329,16 +379,25 @@ private fun ActivityTimeline(items: List<PullRequestTimelineItem>) {
 }
 
 @Composable
-private fun TimelineComment(item: PullRequestTimelineItem.Comment) {
+private fun TimelineComment(item: PullRequestTimelineItem.Comment, compactLayout: Boolean) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Icon(Icons.Outlined.ModeComment, null, tint = EditorialColors.outline, modifier = Modifier.size(18.dp))
         Card(colors = CardDefaults.cardColors(containerColor = EditorialColors.surfaceContainerLowest), shape = RoundedCornerShape(12.dp)) {
             Column(Modifier.padding(16.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(item.actorDisplayName.ifBlank { "Unknown" }, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                        relativeTimeLabel(item.createdDateIso)?.let { label ->
-                            Text(label, style = MaterialTheme.typography.bodySmall, color = EditorialColors.outline)
+                    if (compactLayout) {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(item.actorDisplayName.ifBlank { "Unknown" }, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                            relativeTimeLabel(item.createdDateIso)?.let { label ->
+                                Text(label, style = MaterialTheme.typography.bodySmall, color = EditorialColors.outline)
+                            }
+                        }
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(item.actorDisplayName.ifBlank { "Unknown" }, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                            relativeTimeLabel(item.createdDateIso)?.let { label ->
+                                Text(label, style = MaterialTheme.typography.bodySmall, color = EditorialColors.outline)
+                            }
                         }
                     }
                     Icon(Icons.Outlined.MoreHoriz, null, tint = EditorialColors.outline)
@@ -380,21 +439,31 @@ private fun voteLabel(vote: Int): String =
     }
 
 @Composable
-private fun TimelineApproval(item: PullRequestTimelineItem.Approval) {
+private fun TimelineApproval(item: PullRequestTimelineItem.Approval, compactLayout: Boolean) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Filled.CheckCircle, null, tint = EditorialColors.primary, modifier = Modifier.size(20.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(item.actorDisplayName.ifBlank { "Unknown" }, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-            Text("approved these changes", style = MaterialTheme.typography.bodySmall, color = EditorialColors.onSurfaceVariant)
-            relativeTimeLabel(item.createdDateIso)?.let { label ->
-                Text(label, style = MaterialTheme.typography.bodySmall, color = EditorialColors.outline)
+        if (compactLayout) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(item.actorDisplayName.ifBlank { "Unknown" }, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Text("approved these changes", style = MaterialTheme.typography.bodySmall, color = EditorialColors.onSurfaceVariant)
+                relativeTimeLabel(item.createdDateIso)?.let { label ->
+                    Text(label, style = MaterialTheme.typography.bodySmall, color = EditorialColors.outline)
+                }
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(item.actorDisplayName.ifBlank { "Unknown" }, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Text("approved these changes", style = MaterialTheme.typography.bodySmall, color = EditorialColors.onSurfaceVariant)
+                relativeTimeLabel(item.createdDateIso)?.let { label ->
+                    Text(label, style = MaterialTheme.typography.bodySmall, color = EditorialColors.outline)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun TimelineCommit(item: PullRequestTimelineItem.Commit) {
+private fun TimelineCommit(item: PullRequestTimelineItem.Commit, compactLayout: Boolean) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Icon(Icons.Outlined.Commit, null, tint = EditorialColors.outline, modifier = Modifier.size(18.dp))
         Surface(
@@ -402,13 +471,23 @@ private fun TimelineCommit(item: PullRequestTimelineItem.Commit) {
             color = EditorialColors.surfaceContainer.copy(alpha = 0.5f),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (compactLayout) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(item.commitId, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = EditorialColors.primary)
-                    Text(item.message, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                    Text(item.message, style = MaterialTheme.typography.bodySmall)
+                    relativeTimeLabel(item.createdDateIso)?.let { label ->
+                        Text(label, style = MaterialTheme.typography.bodySmall, color = EditorialColors.outline)
+                    }
                 }
-                relativeTimeLabel(item.createdDateIso)?.let { label ->
-                    Text(label, style = MaterialTheme.typography.bodySmall, color = EditorialColors.outline)
+            } else {
+                Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(item.commitId, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = EditorialColors.primary)
+                        Text(item.message, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                    }
+                    relativeTimeLabel(item.createdDateIso)?.let { label ->
+                        Text(label, style = MaterialTheme.typography.bodySmall, color = EditorialColors.outline)
+                    }
                 }
             }
         }

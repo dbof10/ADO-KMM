@@ -2,6 +2,8 @@ package dev.azure.desktop.release.list
 
 import com.freeletics.flowredux.dsl.FlowReduxStateMachine
 import dev.azure.desktop.domain.pr.DevOpsProject
+import dev.azure.desktop.domain.pr.GetMostSelectedProjectUseCase
+import dev.azure.desktop.domain.pr.IncrementProjectSelectionUseCase
 import dev.azure.desktop.domain.release.ListReleaseDefinitionsUseCase
 import dev.azure.desktop.domain.release.ListReleasesForDefinitionUseCase
 import dev.azure.desktop.domain.release.ReleaseDefinitionSummary
@@ -66,6 +68,8 @@ class ReleaseListStateMachine(
     private val listProjectsUseCase: ListProjectsUseCase,
     private val listReleaseDefinitionsUseCase: ListReleaseDefinitionsUseCase,
     private val listReleasesForDefinitionUseCase: ListReleasesForDefinitionUseCase,
+    private val getMostSelectedProjectUseCase: GetMostSelectedProjectUseCase,
+    private val incrementProjectSelectionUseCase: IncrementProjectSelectionUseCase,
 ) : FlowReduxStateMachine<ReleaseListState, ReleaseListAction>(ReleaseListState.LoadingProjects) {
     init {
         spec {
@@ -75,16 +79,21 @@ class ReleaseListStateMachine(
                         onSuccess = { projects ->
                             val sorted =
                                 projects.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
-                            val first = sorted.firstOrNull()?.name
-                            if (first.isNullOrBlank()) {
+                            val firstProjectName = sorted.firstOrNull()?.name
+                            if (firstProjectName.isNullOrBlank()) {
                                 state.override {
                                     ReleaseListState.ProjectsError("No projects found in this organization.")
                                 }
                             } else {
+                                val defaultProjectName =
+                                    getMostSelectedProjectUseCase(
+                                        organization = organization,
+                                        availableProjectNames = sorted.map { it.name },
+                                    ) ?: firstProjectName
                                 state.override {
                                     ReleaseListState.LoadingDefinitions(
                                         projects = sorted,
-                                        selectedProjectName = first,
+                                        selectedProjectName = defaultProjectName,
                                     )
                                 }
                             }
@@ -146,6 +155,7 @@ class ReleaseListStateMachine(
                     } else if (name == snap.selectedProjectName) {
                         state.noChange()
                     } else {
+                        incrementProjectSelectionUseCase(organization, name)
                         state.override {
                             ReleaseListState.LoadingDefinitions(
                                 projects = snap.projects,
@@ -199,6 +209,7 @@ class ReleaseListStateMachine(
                     if (name.isBlank() || name == snap.selectedProjectName) {
                         state.noChange()
                     } else {
+                        incrementProjectSelectionUseCase(organization, name)
                         state.override {
                             ReleaseListState.LoadingDefinitions(
                                 projects = snap.projects,
@@ -242,6 +253,7 @@ class ReleaseListStateMachine(
                     if (name.isBlank() || name == snap.selectedProjectName) {
                         state.noChange()
                     } else {
+                        incrementProjectSelectionUseCase(organization, name)
                         state.override {
                             ReleaseListState.LoadingDefinitions(
                                 projects = snap.projects,
@@ -285,6 +297,7 @@ class ReleaseListStateMachine(
                     if (name.isBlank() || name == snap.selectedProjectName) {
                         state.noChange()
                     } else {
+                        incrementProjectSelectionUseCase(organization, name)
                         state.override {
                             ReleaseListState.LoadingDefinitions(
                                 projects = snap.projects,
@@ -314,6 +327,7 @@ class ReleaseListStateMachine(
                     if (name.isBlank() || name == snap.selectedProjectName) {
                         state.noChange()
                     } else {
+                        incrementProjectSelectionUseCase(organization, name)
                         state.override {
                             ReleaseListState.LoadingDefinitions(
                                 projects = snap.projects,
