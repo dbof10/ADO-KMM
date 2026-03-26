@@ -1,7 +1,11 @@
 package dev.azure.desktop.ui.screens
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -12,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,7 +26,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.Button
@@ -40,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.AnnotatedString
@@ -166,13 +171,6 @@ private fun DiffToolbar(
             is CodeReviewState.Error -> null
             is CodeReviewState.Content -> state.selectedPath
         }
-    val selectedChangeType =
-        (state as? CodeReviewState.Content)
-            ?.changes
-            ?.firstOrNull { it.path == selected }
-            ?.changeType
-            .orEmpty()
-
     Row(
         Modifier
             .fillMaxWidth()
@@ -189,57 +187,65 @@ private fun DiffToolbar(
                 Text("$folder /", color = EditorialColors.outline, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
             }
             Text(label.substringAfterLast("/"), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-            val badgeText = selectedChangeType.ifBlank { "—" }.uppercase()
-            val badgeColor =
-                when (selectedChangeType.lowercase()) {
-                    "add" -> EditorialColors.primaryFixed
-                    "delete" -> EditorialColors.errorContainer
-                    "edit", "modify" -> EditorialColors.tertiaryFixed
-                    else -> EditorialColors.surfaceContainerHigh
-                }
-            val badgeTextColor =
-                when (selectedChangeType.lowercase()) {
-                    "add" -> EditorialColors.onPrimaryFixed
-                    "delete" -> EditorialColors.onErrorContainer
-                    "edit", "modify" -> EditorialColors.onTertiaryFixed
-                    else -> EditorialColors.outline
-                }
-            Surface(shape = RoundedCornerShape(999.dp), color = badgeColor) {
-                Text(
-                    badgeText,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = badgeTextColor,
-                )
-            }
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Surface(shape = RoundedCornerShape(10.dp), color = EditorialColors.surfaceContainerHigh) {
-                Row(Modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Button(
-                        onClick = { onSelectViewMode(DiffViewMode.SideBySide) },
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                containerColor =
-                                    if (viewMode == DiffViewMode.SideBySide) EditorialColors.surfaceContainerLowest
-                                    else EditorialColors.surfaceContainerHigh,
-                            ),
-                        elevation = ButtonDefaults.buttonElevation(0.dp),
-                    ) {
-                        Text("Side-by-side", fontSize = 11.sp)
-                    }
-                    TextButton(onClick = { onSelectViewMode(DiffViewMode.Inline) }) {
-                        Text(
-                            "Inline",
-                            fontSize = 11.sp,
-                            color = if (viewMode == DiffViewMode.Inline) EditorialColors.onSurface else EditorialColors.outline,
-                        )
-                    }
-                }
-            }
-            Icon(Icons.Outlined.Settings, null, tint = EditorialColors.outline)
+        DiffViewModeToggle(
+            viewMode = viewMode,
+            onSelectViewMode = onSelectViewMode,
+        )
+    }
+}
+
+@Composable
+private fun DiffViewModeToggle(
+    viewMode: DiffViewMode,
+    onSelectViewMode: (DiffViewMode) -> Unit,
+) {
+    val inline = viewMode == DiffViewMode.Inline
+    val trackWidth = 84.dp
+    val trackHeight = 22.dp
+    val thumbSize = 14.dp
+    val edgePad = 4.dp
+    val travel = trackWidth - edgePad * 2 - thumbSize
+    val thumbOffset by animateDpAsState(
+        targetValue = if (inline) travel else 0.dp,
+        animationSpec = tween(durationMillis = 160),
+        label = "diffViewThumb",
+    )
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            "Side-by-side",
+            fontSize = 11.sp,
+            color = if (!inline) EditorialColors.onSurface else EditorialColors.outline,
+        )
+        Box(
+            Modifier
+                .width(trackWidth)
+                .height(trackHeight)
+                .clip(RoundedCornerShape(999.dp))
+                .background(EditorialColors.surfaceContainerHigh)
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() },
+                ) {
+                    onSelectViewMode(if (inline) DiffViewMode.SideBySide else DiffViewMode.Inline)
+                },
+        ) {
+            Text(
+                "Inline",
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp),
+                fontSize = 10.sp,
+                color = EditorialColors.outline,
+            )
+            Box(
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = edgePad)
+                    .offset(x = thumbOffset, y = 0.dp)
+                    .size(thumbSize)
+                    .shadow(1.dp, CircleShape, ambientColor = Color.Black.copy(alpha = 0.12f), spotColor = Color.Black.copy(alpha = 0.12f))
+                    .clip(CircleShape)
+                    .background(EditorialColors.surfaceContainerLowest),
+            )
         }
     }
 }

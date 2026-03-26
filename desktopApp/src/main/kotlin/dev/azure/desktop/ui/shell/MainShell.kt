@@ -2,10 +2,8 @@ package dev.azure.desktop.ui.shell
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import dev.azure.desktop.navigation.AppScreen
@@ -27,17 +25,6 @@ internal fun MainShell(
         AppScreen.DesignSystem -> null
         AppScreen.Login -> null
     }
-    val topNav = when (screen) {
-        AppScreen.PrList -> TopNavSection.PullRequests
-        AppScreen.PrDetail -> TopNavSection.PullRequests
-        AppScreen.CodeReview -> TopNavSection.Repositories
-        AppScreen.ReleaseList -> TopNavSection.Pipelines
-        AppScreen.ReleaseDetail -> TopNavSection.Pipelines
-        AppScreen.DesignSystem -> TopNavSection.PullRequests
-        AppScreen.Login -> TopNavSection.PullRequests
-    }
-    val showSearch = screen == AppScreen.PrList
-
     Row(Modifier.fillMaxSize().background(EditorialColors.surface)) {
         SideRail(
             selected = tab,
@@ -46,22 +33,8 @@ internal fun MainShell(
             onSettings = { onNavigate(AppScreen.DesignSystem) },
             onSignOut = onSignOut,
         )
-        Column(Modifier.weight(1f).fillMaxSize()) {
-            TopBar(
-                showSearch = showSearch,
-                activeTopNav = topNav,
-                onTopNavSelect = { section ->
-                    when (section) {
-                        TopNavSection.PullRequests -> onNavigate(AppScreen.PrList)
-                        TopNavSection.Repositories -> onNavigate(AppScreen.CodeReview)
-                        TopNavSection.Pipelines -> onNavigate(AppScreen.ReleaseList)
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                content()
-            }
+        Box(Modifier.weight(1f).fillMaxSize()) {
+            content()
         }
     }
 }

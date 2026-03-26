@@ -81,14 +81,16 @@ fun PrOverviewScreen(
                 .fillMaxSize()
                 .background(EditorialColors.surfaceContainerLow),
         ) {
-            Column(Modifier.padding(32.dp)) {
+            Column(
+                Modifier.padding(start = 32.dp, top = 32.dp, end = 32.dp, bottom = 8.dp),
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Surface(
                         color = EditorialColors.primaryFixed,
                         shape = RoundedCornerShape(999.dp),
                     ) {
                         Text(
-                            "ACTIVE",
+                            summary.status.uppercase(),
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = EditorialColors.onPrimaryFixed,

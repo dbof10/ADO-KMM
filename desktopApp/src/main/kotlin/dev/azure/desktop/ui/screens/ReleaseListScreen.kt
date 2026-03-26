@@ -140,24 +140,61 @@ fun ReleaseListScreen(
                     }
                 }
 
-            is ReleaseListState.LoadingReleases ->
+            is ReleaseListState.LoadingReleases,
+            is ReleaseListState.Ready,
+            -> {
+                // Single branch keeps ReleaseListLayout in the same composition slot while
+                // reloading releases (Ready → LoadingReleases → Ready), so the pipeline list
+                // scroll position and search query are preserved.
+                val projects =
+                    when (current) {
+                        is ReleaseListState.LoadingReleases -> current.projects
+                        is ReleaseListState.Ready -> current.projects
+                        else -> error("unreachable")
+                    }
+                val selectedProjectName =
+                    when (current) {
+                        is ReleaseListState.LoadingReleases -> current.selectedProjectName
+                        is ReleaseListState.Ready -> current.selectedProjectName
+                        else -> error("unreachable")
+                    }
+                val definitions =
+                    when (current) {
+                        is ReleaseListState.LoadingReleases -> current.definitions
+                        is ReleaseListState.Ready -> current.definitions
+                        else -> error("unreachable")
+                    }
+                val selectedDefinitionId =
+                    when (current) {
+                        is ReleaseListState.LoadingReleases -> current.selectedDefinitionId
+                        is ReleaseListState.Ready -> current.selectedDefinitionId
+                        else -> error("unreachable")
+                    }
+                val releases =
+                    when (current) {
+                        is ReleaseListState.LoadingReleases -> emptyList()
+                        is ReleaseListState.Ready -> current.releases
+                        else -> error("unreachable")
+                    }
+                val listBusy = current is ReleaseListState.LoadingReleases
                 ReleaseListLayout(
                     organization = organization,
-                    projects = current.projects,
-                    selectedProjectName = current.selectedProjectName,
+                    projects = projects,
+                    selectedProjectName = selectedProjectName,
                     onSelectProject = { scope.launch { stateMachine.dispatch(ReleaseListAction.SelectProject(it)) } },
-                    definitions = current.definitions,
-                    selectedDefinitionId = current.selectedDefinitionId,
+                    definitions = definitions,
+                    selectedDefinitionId = selectedDefinitionId,
                     onSelectDefinition = {
                         scope.launch { stateMachine.dispatch(ReleaseListAction.SelectDefinition(it)) }
                     },
-                    releases = emptyList(),
-                    listBusy = true,
+                    releases = releases,
+                    listBusy = listBusy,
                     onRefresh = { scope.launch { stateMachine.dispatch(ReleaseListAction.Refresh) } },
                     onOpenRelease = onOpenRelease,
                     getReleaseDefinition = getReleaseDefinition,
                     createRelease = createRelease,
                 )
+            }
 
             is ReleaseListState.ReleasesError ->
                 Column(Modifier.fillMaxSize().padding(24.dp)) {
@@ -193,24 +230,6 @@ fun ReleaseListScreen(
                     }
                 }
 
-            is ReleaseListState.Ready ->
-                ReleaseListLayout(
-                    organization = organization,
-                    projects = current.projects,
-                    selectedProjectName = current.selectedProjectName,
-                    onSelectProject = { scope.launch { stateMachine.dispatch(ReleaseListAction.SelectProject(it)) } },
-                    definitions = current.definitions,
-                    selectedDefinitionId = current.selectedDefinitionId,
-                    onSelectDefinition = {
-                        scope.launch { stateMachine.dispatch(ReleaseListAction.SelectDefinition(it)) }
-                    },
-                    releases = current.releases,
-                    listBusy = false,
-                    onRefresh = { scope.launch { stateMachine.dispatch(ReleaseListAction.Refresh) } },
-                    onOpenRelease = onOpenRelease,
-                    getReleaseDefinition = getReleaseDefinition,
-                    createRelease = createRelease,
-                )
         }
     }
 }
@@ -233,42 +252,44 @@ private fun ReleaseListLayout(
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxSize().padding(24.dp)) {
-        ProjectStrip(
-            projects = projects,
-            selectedProjectName = selectedProjectName,
-            onSelectProject = onSelectProject,
-            onRefresh = onRefresh,
-        )
-        Spacer(Modifier.height(16.dp))
-        Row(Modifier.fillMaxSize()) {
-            Surface(
-                Modifier.width(320.dp).fillMaxHeight(),
-                color = EditorialColors.surfaceContainerLowest,
-                shape = RoundedCornerShape(12.dp),
-            ) {
-                ReleaseLeftRail(
-                    definitions = definitions,
-                    selectedDefinitionId = selectedDefinitionId,
-                    onSelectDefinition = onSelectDefinition,
-                    onNewRelease = {
-                        if (selectedDefinitionId != null) showCreateDialog = true
-                    },
-                )
-            }
-            Spacer(Modifier.width(16.dp))
-            Surface(
-                Modifier.weight(1f).fillMaxHeight(),
-                color = EditorialColors.surfaceContainerLowest,
-                shape = RoundedCornerShape(12.dp),
-            ) {
-                ReleaseMainPanel(
-                    definitions = definitions,
-                    selectedDefinitionId = selectedDefinitionId,
-                    releases = releases,
-                    busy = listBusy,
-                    onOpenRelease = onOpenRelease,
-                )
+    Box(Modifier.fillMaxSize().padding(24.dp)) {
+        Column(Modifier.fillMaxSize()) {
+            ProjectStrip(
+                projects = projects,
+                selectedProjectName = selectedProjectName,
+                onSelectProject = onSelectProject,
+                onRefresh = onRefresh,
+            )
+            Spacer(Modifier.height(16.dp))
+            Row(Modifier.fillMaxSize()) {
+                Surface(
+                    Modifier.width(320.dp).fillMaxHeight(),
+                    color = EditorialColors.surfaceContainerLowest,
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    ReleaseLeftRail(
+                        definitions = definitions,
+                        selectedDefinitionId = selectedDefinitionId,
+                        onSelectDefinition = onSelectDefinition,
+                        onNewRelease = {
+                            if (selectedDefinitionId != null) showCreateDialog = true
+                        },
+                    )
+                }
+                Spacer(Modifier.width(16.dp))
+                Surface(
+                    Modifier.weight(1f).fillMaxHeight(),
+                    color = EditorialColors.surfaceContainerLowest,
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    ReleaseMainPanel(
+                        definitions = definitions,
+                        selectedDefinitionId = selectedDefinitionId,
+                        releases = releases,
+                        busy = listBusy,
+                        onOpenRelease = onOpenRelease,
+                    )
+                }
             }
         }
 
@@ -283,6 +304,7 @@ private fun ReleaseListLayout(
                 createRelease = createRelease,
                 onDismiss = { showCreateDialog = false },
                 onCreated = onRefresh,
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }

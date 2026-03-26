@@ -1,5 +1,6 @@
 package dev.azure.desktop
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -12,6 +13,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import dev.azure.desktop.data.auth.JvmAuthServices
 import dev.azure.desktop.data.pr.JvmPullRequestServices
@@ -213,7 +215,10 @@ fun App() {
                             }
                             val scope = rememberCoroutineScope()
                             when (val current = detailState) {
-                                PrDetailState.Loading -> CircularProgressIndicator()
+                                PrDetailState.Loading ->
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator()
+                                    }
 
                                 is PrDetailState.Error -> Text(current.message)
 

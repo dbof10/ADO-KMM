@@ -1,10 +1,15 @@
 package dev.azure.desktop.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -39,7 +44,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.azure.desktop.domain.release.CreateReleaseParams
 import dev.azure.desktop.domain.release.CreatedRelease
 import dev.azure.desktop.domain.release.ReleaseDefinitionDetail
@@ -57,6 +61,7 @@ fun CreateReleaseDialog(
     createRelease: suspend (CreateReleaseParams) -> Result<CreatedRelease>,
     onDismiss: () -> Unit,
     onCreated: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     if (!visible) return
 
@@ -80,144 +85,187 @@ fun CreateReleaseDialog(
         )
     }
 
-    Dialog(onCloseRequest = { if (!busy) onDismiss() }) {
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val panelWidth = maxWidth * 0.3f
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f))
+                .clickable(enabled = !busy) { onDismiss() },
+        )
         Surface(
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp),
             color = EditorialColors.surfaceContainerLowest,
-            modifier = Modifier.width(560.dp),
+            tonalElevation = 3.dp,
+            shadowElevation = 8.dp,
+            modifier =
+                Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .width(panelWidth),
         ) {
-            Column(Modifier.padding(20.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column {
-                        Text("Create a new release", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        definition?.let { Text(it.name, style = MaterialTheme.typography.bodyMedium, color = EditorialColors.onSurfaceVariant) }
+            Column(Modifier.fillMaxHeight()) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "Create a new release",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        definition?.let {
+                            Text(
+                                it.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = EditorialColors.onSurfaceVariant,
+                            )
+                        }
                     }
                     IconButton(onClick = { if (!busy) onDismiss() }, enabled = !busy) {
                         Icon(Icons.Outlined.Close, contentDescription = "Close")
                     }
                 }
-                Spacer(Modifier.height(16.dp))
 
-                loadError?.let { err ->
-                    Text(err, color = EditorialColors.error)
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp)
+                        .padding(bottom = 8.dp),
+                ) {
+                    loadError?.let { err ->
+                        Text(err, color = EditorialColors.error)
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedButton(onClick = onDismiss) { Text("Close") }
+                        return@Column
+                    }
+
+                    if (definition == null) {
+                        Row(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalArrangement = Arrangement.Center) {
+                            CircularProgressIndicator()
+                        }
+                        return@Column
+                    }
+
+                    val def = definition!!
+
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Icon(Icons.Outlined.Bolt, contentDescription = null, tint = EditorialColors.primary)
+                        Text("Pipeline", fontWeight = FontWeight.SemiBold)
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Tap a stage to mark it for manual deployment (sent as manualEnvironments to Azure DevOps). Others keep the definition default.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = EditorialColors.onSurfaceVariant,
+                    )
                     Spacer(Modifier.height(12.dp))
-                    OutlinedButton(onClick = onDismiss) { Text("Close") }
-                    return@Column
-                }
+                    PipelinePreview(
+                        stages = def.stages,
+                        manualNames = manualNames,
+                        onToggle = { name ->
+                            manualNames = manualNames.toMutableSet().apply { if (!add(name)) remove(name) }
+                        },
+                    )
+                    Spacer(Modifier.height(16.dp))
 
-                if (definition == null) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        CircularProgressIndicator()
-                    }
-                    return@Column
-                }
-
-                val def = definition!!
-
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon(Icons.Outlined.Bolt, contentDescription = null, tint = EditorialColors.primary)
-                    Text("Pipeline", fontWeight = FontWeight.SemiBold)
-                }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Tap a stage to mark it for manual deployment (sent as manualEnvironments to Azure DevOps). Others keep the definition default.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = EditorialColors.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(12.dp))
-                PipelinePreview(stages = def.stages, manualNames = manualNames, onToggle = { name ->
-                    manualNames = manualNames.toMutableSet().apply { if (!add(name)) remove(name) }
-                })
-                Spacer(Modifier.height(16.dp))
-
-                Text("Stages for a trigger change from automated to manual", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.height(8.dp))
-                Column(Modifier.height(160.dp).verticalScroll(rememberScrollState())) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val all = def.stages.map { it.name }.toSet()
-                        val allSelected = all.isNotEmpty() && manualNames.containsAll(all)
-                        Checkbox(
-                            checked = allSelected,
-                            onCheckedChange = { checked ->
-                                manualNames = if (checked) all else emptySet()
-                            },
-                        )
-                        Text("Select all")
-                    }
-                    def.stages.forEach { stage ->
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Stages for a trigger change from automated to manual",
+                        fontWeight = FontWeight.Medium,
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            val all = def.stages.map { it.name }.toSet()
+                            val allSelected = all.isNotEmpty() && manualNames.containsAll(all)
                             Checkbox(
-                                checked = manualNames.contains(stage.name),
-                                onCheckedChange = {
-                                    manualNames = manualNames.toMutableSet().apply {
-                                        if (!add(stage.name)) remove(stage.name)
-                                    }
+                                checked = allSelected,
+                                onCheckedChange = { checked ->
+                                    manualNames = if (checked) all else emptySet()
                                 },
                             )
-                            Text(stage.name)
+                            Text("Select all")
                         }
-                    }
-                }
-
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    modifier = Modifier.fillMaxWidth().height(140.dp),
-                    label = { Text("Release description") },
-                    maxLines = 6,
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EditorialColors.primary),
-                )
-
-                submitError?.let {
-                    Spacer(Modifier.height(8.dp))
-                    Text(it, color = EditorialColors.error, style = MaterialTheme.typography.bodySmall)
-                }
-
-                Spacer(Modifier.height(16.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedButton(onClick = { if (!busy) onDismiss() }, enabled = !busy) {
-                        Text("Cancel")
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                busy = true
-                                submitError = null
-                                createRelease(
-                                    CreateReleaseParams(
-                                        organization = organization,
-                                        projectName = projectName,
-                                        definitionId = definitionId,
-                                        description = description.trim(),
-                                        manualEnvironmentNames = manualNames.toList(),
-                                    ),
-                                ).fold(
-                                    onSuccess = {
-                                        busy = false
-                                        onCreated()
-                                        onDismiss()
-                                    },
-                                    onFailure = {
-                                        busy = false
-                                        submitError = it.message ?: "Create failed."
+                        def.stages.forEach { stage ->
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(
+                                    checked = manualNames.contains(stage.name),
+                                    onCheckedChange = {
+                                        manualNames = manualNames.toMutableSet().apply {
+                                            if (!add(stage.name)) remove(stage.name)
+                                        }
                                     },
                                 )
+                                Text(stage.name)
                             }
-                        },
-                        enabled = !busy,
-                        colors = ButtonDefaults.buttonColors(containerColor = EditorialColors.primaryContainer),
-                    ) {
-                        if (busy) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = EditorialColors.onPrimary,
-                            )
-                        } else {
-                            Text("Create")
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        modifier = Modifier.fillMaxWidth().height(140.dp),
+                        label = { Text("Release description") },
+                        maxLines = 6,
+                        shape = RoundedCornerShape(10.dp),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EditorialColors.primary),
+                    )
+
+                    submitError?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, color = EditorialColors.error, style = MaterialTheme.typography.bodySmall)
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(onClick = { if (!busy) onDismiss() }, enabled = !busy) {
+                            Text("Cancel")
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    busy = true
+                                    submitError = null
+                                    createRelease(
+                                        CreateReleaseParams(
+                                            organization = organization,
+                                            projectName = projectName,
+                                            definitionId = definitionId,
+                                            description = description.trim(),
+                                            manualEnvironmentNames = manualNames.toList(),
+                                        ),
+                                    ).fold(
+                                        onSuccess = {
+                                            busy = false
+                                            onCreated()
+                                            onDismiss()
+                                        },
+                                        onFailure = {
+                                            busy = false
+                                            submitError = it.message ?: "Create failed."
+                                        },
+                                    )
+                                }
+                            },
+                            enabled = !busy,
+                            colors = ButtonDefaults.buttonColors(containerColor = EditorialColors.primaryContainer),
+                        ) {
+                            if (busy) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = EditorialColors.onPrimary,
+                                )
+                            } else {
+                                Text("Create")
+                            }
                         }
                     }
                 }
