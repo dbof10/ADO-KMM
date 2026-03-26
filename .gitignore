@@ -1,6 +1,8 @@
 # Gradle
 .gradle/
 build/
+# Local JDK truststore (corporate CA); generate with scripts/setup-chs-truststore.sh
+gradle/ado-desktop-chs-truststore.jks
 **/build/
 !gradle/wrapper/gradle-wrapper.jar
 

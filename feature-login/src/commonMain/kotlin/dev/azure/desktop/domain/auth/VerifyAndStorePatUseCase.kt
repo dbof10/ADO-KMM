@@ -16,7 +16,8 @@ class VerifyAndStorePatUseCase(
         if (trimmed.isEmpty()) {
             return Result.failure(IllegalArgumentException("Enter a personal access token."))
         }
-        return withContext(Dispatchers.IO) {
+        // Default (not IO): Dispatchers.IO is JVM-only; Native/iOS cannot access it.
+        return withContext(Dispatchers.Default) {
             verifier.verify(trimmedOrg, trimmed).fold(
                 onSuccess = {
                     storage.savePat(trimmed).fold(
