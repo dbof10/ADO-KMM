@@ -149,11 +149,18 @@ private fun ReleaseDetailBody(
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
             }
-            Text(
-                "${detail.definitionName} › ${detail.name}",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "${detail.definitionName} › ${detail.name}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    "Build ${detail.id}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = EditorialColors.onSurfaceVariant,
+                )
+            }
         }
         Spacer(Modifier.height(8.dp))
         TabRow(

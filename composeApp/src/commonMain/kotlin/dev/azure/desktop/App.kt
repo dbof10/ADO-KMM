@@ -10,6 +10,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import dev.azure.desktop.ui.components.MascotLoadingIndicator
 import androidx.compose.material3.Text
@@ -40,17 +41,21 @@ import dev.azure.desktop.ui.screens.PrOverviewScreen
 import dev.azure.desktop.ui.screens.ReleaseDetailScreen
 import dev.azure.desktop.ui.screens.ReleaseListScreen
 import dev.azure.desktop.ui.shell.MainShell
+import dev.azure.desktop.deeplink.parseAzureDevOpsPullRequestUrl
+import dev.azure.desktop.platform.DeepLinkEffect
 import kotlinx.coroutines.launch
 
 @Composable
 fun App() {
     EditorialTheme {
+        val appScope = rememberCoroutineScope()
         val initialPat = remember { authBridge.patStorage.loadPat() }
         val initialOrganization = remember { authBridge.patStorage.loadOrganization().orEmpty() }
         val hasStoredSession = remember(initialPat, initialOrganization) {
             initialPat != null && initialOrganization.isNotBlank()
         }
         var organization by remember { mutableStateOf(initialOrganization) }
+        val organizationForDeepLink = rememberUpdatedState(organization)
         val screen = remember {
             mutableStateOf(if (hasStoredSession) AppScreen.PrList else AppScreen.Login)
         }
@@ -167,6 +172,27 @@ fun App() {
                 authBridge.runOnMainThread { authActions.onSessionExpiredFromHttp() }
             }
             onDispose { authBridge.setOnSessionUnauthorized { } }
+        }
+
+        DeepLinkEffect { raw ->
+            val parsed = parseAzureDevOpsPullRequestUrl(raw) ?: return@DeepLinkEffect
+            val org = organizationForDeepLink.value.trim()
+            if (org.isEmpty()) return@DeepLinkEffect
+            if (!parsed.organization.equals(org, ignoreCase = true)) return@DeepLinkEffect
+            appScope.launch {
+                pullRequestBridge.getPullRequestSummaryByIdUseCase(
+                    organization = org,
+                    projectName = parsed.project,
+                    pullRequestId = parsed.pullRequestId,
+                ).fold(
+                    onSuccess = { summary ->
+                        selectedPullRequest = summary
+                        selectedRelease = null
+                        screen.value = AppScreen.PrDetail
+                    },
+                    onFailure = { },
+                )
+            }
         }
 
         val signOut: () -> Unit = {
