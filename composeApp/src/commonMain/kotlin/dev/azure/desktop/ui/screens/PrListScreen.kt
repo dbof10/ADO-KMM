@@ -19,7 +19,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import dev.azure.desktop.ui.components.MascotLoadingIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -109,7 +109,7 @@ internal fun PrListScreenContent(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        CircularProgressIndicator()
+                        MascotLoadingIndicator()
                         Text("Loading projects…", color = EditorialColors.onSurfaceVariant)
                     }
                 }
@@ -152,7 +152,7 @@ internal fun PrListScreenContent(
                         Modifier.fillMaxWidth().padding(top = 24.dp),
                         horizontalArrangement = Arrangement.Center,
                     ) {
-                        CircularProgressIndicator()
+                        MascotLoadingIndicator()
                     }
                 }
 

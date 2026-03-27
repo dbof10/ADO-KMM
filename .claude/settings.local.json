@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew :composeApp:tasks --all)",
+      "Bash(jobs -l)",
+      "Bash(wait 39574)"
+    ]
+  }
+}

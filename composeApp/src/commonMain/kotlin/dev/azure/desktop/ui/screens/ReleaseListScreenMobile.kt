@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material3.CircularProgressIndicator
+import dev.azure.desktop.ui.components.MascotLoadingIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
@@ -167,7 +167,7 @@ internal fun ReleaseListLayoutMobile(
                     when (mainTab) {
                         0 -> {
                             if (listBusy) {
-                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { MascotLoadingIndicator() }
                             } else if (releases.isEmpty()) {
                                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                     Text("No releases yet.", color = EditorialColors.onSurfaceVariant)
@@ -178,7 +178,7 @@ internal fun ReleaseListLayoutMobile(
                         }
                         else -> {
                             if (listBusy) {
-                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { MascotLoadingIndicator() }
                             } else if (releases.isEmpty()) {
                                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                     Text("No deployments — no releases loaded.", color = EditorialColors.onSurfaceVariant)

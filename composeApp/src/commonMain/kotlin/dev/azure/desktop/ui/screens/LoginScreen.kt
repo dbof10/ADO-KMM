@@ -26,7 +26,7 @@ import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import dev.azure.desktop.ui.components.MascotLoadingIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -45,7 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -142,10 +142,11 @@ internal fun LoginFormPane(
     onSubmit: () -> Unit,
     showHelpCard: Boolean,
     includeBrandHeader: Boolean = false,
+    verticalArrangement: Arrangement.Vertical = Arrangement.Center,
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = verticalArrangement,
     ) {
         if (includeBrandHeader) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -197,8 +198,10 @@ internal fun LoginFormPane(
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text("Paste your PAT here...") },
             leadingIcon = { Icon(Icons.Outlined.VpnKey, null, tint = EditorialColors.outline) },
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions.Default,
+            keyboardOptions = KeyboardOptions(
+                autoCorrect = false,
+                keyboardType = KeyboardType.Ascii,
+            ),
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -249,11 +252,7 @@ internal fun LoginFormPane(
                 horizontalArrangement = Arrangement.Center,
             ) {
                 if (isWorking) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        strokeWidth = 2.dp,
-                        color = EditorialColors.onPrimary,
-                    )
+                    MascotLoadingIndicator(size = 24.dp)
                     Spacer(Modifier.width(12.dp))
                 }
                 Text("Connect to The Ledger", fontWeight = FontWeight.Bold)

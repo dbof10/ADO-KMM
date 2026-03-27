@@ -16,7 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import dev.azure.desktop.ui.components.MascotLoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -75,7 +75,7 @@ internal fun PrDetailScreenContent(
     ) {
         when (val current = state) {
             PrDetailState.Loading -> {
-                CircularProgressIndicator(Modifier.align(Alignment.Center))
+                MascotLoadingIndicator(modifier = Modifier.align(Alignment.Center))
             }
 
             is PrDetailState.Error -> {

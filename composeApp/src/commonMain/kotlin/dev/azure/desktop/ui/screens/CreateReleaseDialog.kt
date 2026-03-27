@@ -24,7 +24,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
+import dev.azure.desktop.ui.components.MascotLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -233,7 +233,7 @@ private fun CreateReleaseDialogContent(
 
             if (definition == null) {
                 Row(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalArrangement = Arrangement.Center) {
-                    CircularProgressIndicator()
+                    MascotLoadingIndicator()
                 }
                 return@Column
             }
@@ -321,11 +321,7 @@ private fun CreateReleaseDialogContent(
                     colors = ButtonDefaults.buttonColors(containerColor = EditorialColors.primaryContainer),
                 ) {
                     if (busy) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                            color = EditorialColors.onPrimary,
-                        )
+                        MascotLoadingIndicator(size = 22.dp)
                     } else {
                         Text("Create")
                     }

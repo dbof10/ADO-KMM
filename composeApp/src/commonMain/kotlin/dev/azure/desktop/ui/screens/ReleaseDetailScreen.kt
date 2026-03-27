@@ -26,7 +26,7 @@ import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import dev.azure.desktop.ui.components.MascotLoadingIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -106,7 +106,7 @@ internal fun ReleaseDetailScreenContent(
         when (val current = state) {
             ReleaseDetailState.Loading ->
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                    MascotLoadingIndicator()
                 }
 
             is ReleaseDetailState.Error ->
@@ -328,11 +328,7 @@ private fun StagesFlowColumn(
             ) {
                 Text("Stages", fontWeight = FontWeight.SemiBold)
                 if (isDeploying) {
-                    CircularProgressIndicator(
-                        Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = EditorialColors.primary,
-                    )
+                    MascotLoadingIndicator(size = 24.dp)
                 }
             }
             OutlinedButton(onClick = onReload, enabled = !isDeploying) {
