@@ -42,7 +42,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import dev.azure.desktop.domain.pr.CreatePullRequestParams
+import dev.azure.desktop.domain.pr.CreatedPullRequest
 import dev.azure.desktop.domain.pr.DevOpsProject
+import dev.azure.desktop.domain.pr.PullRequestRepositoryRef
 import dev.azure.desktop.domain.pr.PullRequestSummary
 import dev.azure.desktop.pr.list.PrListAction
 import dev.azure.desktop.pr.list.PrListState
@@ -55,13 +58,17 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun PrListScreen(
+    organization: String,
     stateMachine: PrListStateMachine,
     listState: PrListState,
+    listPullRequestRepositories: suspend (organization: String, projectName: String) -> Result<List<PullRequestRepositoryRef>>,
+    createPullRequest: suspend (CreatePullRequestParams) -> Result<CreatedPullRequest>,
     onOpenPullRequest: (PullRequestSummary) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
     var prNumberInput by remember { mutableStateOf("") }
+    var showCreatePrDialog by remember { mutableStateOf(false) }
 
     BoxWithConstraints(modifier.fillMaxSize()) {
         val compactLayout = layoutClassForWidth(maxWidth) == LayoutClass.Compact
@@ -71,6 +78,12 @@ fun PrListScreen(
                 state = listState,
                 prNumberInput = prNumberInput,
                 onPrNumberInputChange = { prNumberInput = it },
+                organization = organization,
+                showCreatePrDialog = showCreatePrDialog,
+                onOpenCreatePr = { showCreatePrDialog = true },
+                onDismissCreatePr = { showCreatePrDialog = false },
+                listPullRequestRepositories = listPullRequestRepositories,
+                createPullRequest = createPullRequest,
                 onOpenPullRequest = onOpenPullRequest,
                 scope = scope,
             )
@@ -80,6 +93,12 @@ fun PrListScreen(
                 state = listState,
                 prNumberInput = prNumberInput,
                 onPrNumberInputChange = { prNumberInput = it },
+                organization = organization,
+                showCreatePrDialog = showCreatePrDialog,
+                onOpenCreatePr = { showCreatePrDialog = true },
+                onDismissCreatePr = { showCreatePrDialog = false },
+                listPullRequestRepositories = listPullRequestRepositories,
+                createPullRequest = createPullRequest,
                 onOpenPullRequest = onOpenPullRequest,
                 scope = scope,
             )
@@ -93,10 +112,23 @@ internal fun PrListScreenContent(
     state: PrListState,
     prNumberInput: String,
     onPrNumberInputChange: (String) -> Unit,
+    organization: String,
+    showCreatePrDialog: Boolean,
+    onOpenCreatePr: () -> Unit,
+    onDismissCreatePr: () -> Unit,
+    listPullRequestRepositories: suspend (organization: String, projectName: String) -> Result<List<PullRequestRepositoryRef>>,
+    createPullRequest: suspend (CreatePullRequestParams) -> Result<CreatedPullRequest>,
     onOpenPullRequest: (PullRequestSummary) -> Unit,
     scope: kotlinx.coroutines.CoroutineScope,
     compactLayout: Boolean,
 ) {
+    val selectedProjectForCreatePr =
+        when (state) {
+            is PrListState.LoadingPullRequests -> state.selectedProjectName
+            is PrListState.Ready -> state.selectedProjectName
+            is PrListState.PullRequestsError -> state.selectedProjectName
+            else -> null
+        }
     Surface(Modifier.fillMaxSize(), color = EditorialColors.surfaceContainerLow) {
         Column(Modifier.fillMaxSize().padding(if (compactLayout) 16.dp else 24.dp)) {
             Text("Pull requests", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -177,6 +209,18 @@ internal fun PrListScreenContent(
                         onSelectTab = { scope.launch { stateMachine.dispatch(PrListAction.SelectTab(it)) } },
                     )
                     Spacer(Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        Button(
+                            onClick = onOpenCreatePr,
+                            enabled = current.selectedProjectName != null,
+                        ) {
+                            Text("New pull request")
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
                     current.openPullRequestError?.let { msg ->
                         Text(msg, color = EditorialColors.error)
                         Spacer(Modifier.height(8.dp))
@@ -238,6 +282,18 @@ internal fun PrListScreenContent(
             }
         }
     }
+    CreatePullRequestDialog(
+        visible = showCreatePrDialog,
+        compactLayout = compactLayout,
+        organization = organization,
+        projectName = selectedProjectForCreatePr,
+        listRepositories = listPullRequestRepositories,
+        createPullRequest = createPullRequest,
+        onDismiss = onDismissCreatePr,
+        onCreated = { created ->
+            scope.launch { stateMachine.dispatch(PrListAction.OpenPullRequestById(created.pullRequestId)) }
+        },
+    )
 }
 
 @Composable

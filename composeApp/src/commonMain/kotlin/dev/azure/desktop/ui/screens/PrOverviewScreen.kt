@@ -28,6 +28,7 @@ import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Pending
 import androidx.compose.material.icons.outlined.Task
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -51,6 +52,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -61,6 +64,7 @@ import dev.azure.desktop.domain.pr.PullRequestCheckStatus
 import dev.azure.desktop.domain.pr.PullRequestLinkedWorkItem
 import dev.azure.desktop.domain.pr.PullRequestReviewer
 import dev.azure.desktop.domain.pr.PullRequestTimelineItem
+import dev.azure.desktop.deeplink.azureDevOpsPullRequestWebUrl
 import dev.azure.desktop.pr.review.CodeReviewStateMachine
 import dev.azure.desktop.theme.EditorialColors
 import dev.azure.desktop.ui.adaptive.LayoutClass
@@ -70,6 +74,7 @@ import kotlinx.datetime.Instant
 
 @Composable
 fun PrOverviewScreen(
+    organization: String,
     detail: PullRequestDetail,
     codeReviewStateMachine: CodeReviewStateMachine,
     isVoting: Boolean,
@@ -87,6 +92,7 @@ fun PrOverviewScreen(
         val compactLayout = layoutClassForWidth(maxWidth) == LayoutClass.Compact
         if (compactLayout) {
             PrOverviewScreenMobile(
+                organization = organization,
                 detail = detail,
                 codeReviewStateMachine = codeReviewStateMachine,
                 isVoting = isVoting,
@@ -98,6 +104,7 @@ fun PrOverviewScreen(
             )
         } else {
             PrOverviewScreenDesktop(
+                organization = organization,
                 detail = detail,
                 codeReviewStateMachine = codeReviewStateMachine,
                 isVoting = isVoting,
@@ -113,6 +120,7 @@ fun PrOverviewScreen(
 
 @Composable
 internal fun PrOverviewScreenContent(
+    organization: String,
     detail: PullRequestDetail,
     codeReviewStateMachine: CodeReviewStateMachine,
     isVoting: Boolean,
@@ -124,6 +132,14 @@ internal fun PrOverviewScreenContent(
     compactLayout: Boolean,
 ) {
     val summary = detail.summary
+    val clipboard = LocalClipboardManager.current
+    val prWebUrl =
+        azureDevOpsPullRequestWebUrl(
+            organization = organization,
+            projectName = summary.projectName,
+            repositoryName = summary.repositoryName,
+            pullRequestId = summary.id,
+        )
     var selectedTab by remember { mutableIntStateOf(0) }
     Column(modifier = modifier.fillMaxSize()) {
             Column(
@@ -134,31 +150,49 @@ internal fun PrOverviewScreenContent(
                     bottom = 8.dp,
                 ),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "Back",
-                        )
-                    }
-                    Surface(
-                        color = EditorialColors.primaryFixed,
-                        shape = RoundedCornerShape(999.dp),
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                                contentDescription = "Back",
+                            )
+                        }
+                        Surface(
+                            color = EditorialColors.primaryFixed,
+                            shape = RoundedCornerShape(999.dp),
+                        ) {
+                            Text(
+                                summary.status.uppercase(),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = EditorialColors.onPrimaryFixed,
+                                fontSize = 10.sp,
+                            )
+                        }
                         Text(
-                            summary.status.uppercase(),
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = EditorialColors.onPrimaryFixed,
-                            fontSize = 10.sp,
+                            "PR #${summary.id}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = EditorialColors.outline,
+                            fontWeight = FontWeight.Medium,
                         )
                     }
-                    Text(
-                        "PR #${summary.id}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = EditorialColors.outline,
-                        fontWeight = FontWeight.Medium,
-                    )
+                    Spacer(Modifier.weight(1f))
+                    IconButton(
+                        onClick = { clipboard.setText(AnnotatedString(prWebUrl)) },
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Share,
+                            contentDescription = "Copy pull request link",
+                            tint = EditorialColors.primary,
+                        )
+                    }
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(

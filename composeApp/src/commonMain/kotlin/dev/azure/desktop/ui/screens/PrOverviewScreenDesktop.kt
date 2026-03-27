@@ -7,6 +7,7 @@ import dev.azure.desktop.pr.review.CodeReviewStateMachine
 
 @Composable
 internal fun PrOverviewScreenDesktop(
+    organization: String,
     detail: PullRequestDetail,
     codeReviewStateMachine: CodeReviewStateMachine,
     isVoting: Boolean,
@@ -17,6 +18,7 @@ internal fun PrOverviewScreenDesktop(
     modifier: Modifier = Modifier,
 ) {
     PrOverviewScreenContent(
+        organization = organization,
         detail = detail,
         codeReviewStateMachine = codeReviewStateMachine,
         isVoting = isVoting,

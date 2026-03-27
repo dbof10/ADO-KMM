@@ -6,10 +6,16 @@ import dev.azure.desktop.domain.pr.PullRequestChange
 import dev.azure.desktop.domain.pr.PullRequestCheckState
 import dev.azure.desktop.domain.pr.PullRequestCheckStatus
 import dev.azure.desktop.domain.pr.PullRequestLinkedWorkItem
+import dev.azure.desktop.domain.pr.PullRequestBranchRef
 import dev.azure.desktop.domain.pr.PullRequestRepository
+import dev.azure.desktop.domain.pr.PullRequestRepositoryRef
+import dev.azure.desktop.domain.pr.PullRequestSuggestion
 import dev.azure.desktop.domain.pr.PullRequestReviewer
 import dev.azure.desktop.domain.pr.PullRequestSummary
 import dev.azure.desktop.domain.pr.PullRequestTimelineItem
+import dev.azure.desktop.domain.pr.PrSuggestionLog
+import dev.azure.desktop.domain.pr.CreatePullRequestParams
+import dev.azure.desktop.domain.pr.CreatedPullRequest
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.request
@@ -41,6 +47,12 @@ private const val ApiVersion = "7.1"
 /** `connectiondata` rejects `7.1` with 400; same version as [dev.azure.desktop.data.auth.AdoRestPatVerifier]. */
 private const val ConnectionDataApiVersion = "7.0-preview.1"
 private const val Host = "dev.azure.com"
+
+private data class ConnectionAuthenticatedUser(
+    val id: String,
+    val uniqueName: String?,
+    val mailAddress: String?,
+)
 
 class AdoPullRequestRepository(
     private val httpClient: HttpClient,
@@ -97,6 +109,18 @@ class AdoPullRequestRepository(
             parseSummaryList(response.bodyAsText())
         }
 
+    private fun parseConnectionAuthenticatedUser(raw: String): ConnectionAuthenticatedUser? {
+        val root = json.parseToJsonElement(raw).jsonObject
+        val authUser = root["authenticatedUser"].asObjectOrNull() ?: return null
+        val id = authUser["id"].stringOrNull().orEmpty()
+        if (id.isBlank()) return null
+        return ConnectionAuthenticatedUser(
+            id = id,
+            uniqueName = authUser["uniqueName"].stringOrNull(),
+            mailAddress = authUser["mailAddress"].stringOrNull(),
+        )
+    }
+
     private suspend fun getAuthenticatedUserId(organization: String): String {
         val url =
             "https://$Host/${organization.encodeURLPathPart()}/_apis/connectiondata" +
@@ -109,11 +133,23 @@ class AdoPullRequestRepository(
             "Unable to resolve current user (${response.status.value}). " +
                 if (hint.isNotBlank()) hint else "Check token and organization."
         }
-        val root = json.parseToJsonElement(response.bodyAsText()).jsonObject
-        val authUser = root["authenticatedUser"].asObjectOrNull()
-        val id = authUser?.get("id").stringOrNull().orEmpty()
-        require(id.isNotBlank()) { "Unable to resolve current user id." }
-        return id
+        val user = parseConnectionAuthenticatedUser(response.bodyAsText())
+        require(user != null) { "Unable to resolve current user id." }
+        return user.id
+    }
+
+    private suspend fun getConnectionAuthenticatedUser(organization: String): ConnectionAuthenticatedUser? {
+        val url =
+            "https://$Host/${organization.encodeURLPathPart()}/_apis/connectiondata" +
+                "?api-version=$ConnectionDataApiVersion"
+        val response = httpClient.get(url) {
+            headers.append(HttpHeaders.Authorization, basicAuth())
+        }
+        if (!response.status.isSuccess()) {
+            PrSuggestionLog.d("repo: connectiondata HTTP ${response.status.value}")
+            return null
+        }
+        return parseConnectionAuthenticatedUser(response.bodyAsText())
     }
 
     override suspend fun getActivePullRequests(organization: String, projectName: String?): Result<List<PullRequestSummary>> =
@@ -132,6 +168,186 @@ class AdoPullRequestRepository(
                 "Unable to load pull requests (${response.status.value})."
             }
             parseSummaryList(response.bodyAsText())
+        }
+
+    override suspend fun listRepositories(
+        organization: String,
+        projectName: String,
+    ): Result<List<PullRequestRepositoryRef>> =
+        runCatching {
+            require(organization.isNotBlank()) { "Missing organization." }
+            require(projectName.isNotBlank()) { "Missing project name." }
+            val url =
+                "https://$Host/${organization.encodeURLPathPart()}/${projectName.encodeURLPathPart()}/" +
+                    "_apis/git/repositories?api-version=$ApiVersion"
+            val response = httpClient.get(url) {
+                headers.append(HttpHeaders.Authorization, basicAuth())
+            }
+            require(response.status.isSuccess()) {
+                "Unable to load repositories (${response.status.value})."
+            }
+            parseRepositories(response.bodyAsText())
+        }
+
+    override suspend fun listBranches(
+        organization: String,
+        projectName: String,
+        repositoryId: String,
+    ): Result<List<PullRequestBranchRef>> =
+        runCatching {
+            require(organization.isNotBlank()) { "Missing organization." }
+            require(projectName.isNotBlank()) { "Missing project name." }
+            require(repositoryId.isNotBlank()) { "Missing repository id." }
+            val base =
+                "https://$Host/${organization.encodeURLPathPart()}/${projectName.encodeURLPathPart()}/" +
+                    "_apis/git/repositories/${repositoryId.encodeURLPathPart()}/refs"
+            // Keep this broad: includeStatuses/latestStatusesOnly can result in zero refs for many repos.
+            val primaryUrl = "$base?filter=heads/&\$top=500&api-version=$ApiVersion"
+            val response = httpClient.get(primaryUrl) {
+                headers.append(HttpHeaders.Authorization, basicAuth())
+            }
+            require(response.status.isSuccess()) {
+                "Unable to load branches (${response.status.value})."
+            }
+            val primary = parseBranches(response.bodyAsText())
+            if (primary.isNotEmpty()) return@runCatching primary
+
+            // Fallback: retry without filter in case server-side filter behavior differs.
+            val fallbackUrl = "$base?\$top=500&api-version=$ApiVersion"
+            val fallbackResponse = httpClient.get(fallbackUrl) {
+                headers.append(HttpHeaders.Authorization, basicAuth())
+            }
+            if (!fallbackResponse.status.isSuccess()) {
+                PrSuggestionLog.d(
+                    "repo: listBranches fallback failed project=$projectName repo=$repositoryId status=${fallbackResponse.status.value}",
+                )
+                return@runCatching emptyList()
+            }
+            val fallback = parseBranches(fallbackResponse.bodyAsText())
+            PrSuggestionLog.d(
+                "repo: listBranches fallback used project=$projectName repo=$repositoryId refs=${fallback.size}",
+            )
+            fallback
+        }
+
+    override suspend fun findCreatePullRequestSuggestion(
+        organization: String,
+        projectName: String?,
+    ): Result<PullRequestSuggestion?> =
+        runCatching {
+            require(organization.isNotBlank()) { "Missing organization." }
+            val me = getConnectionAuthenticatedUser(organization)
+            PrSuggestionLog.d(
+                "repo: authenticated id=${me?.id ?: "(null)"} uniqueName=${me?.uniqueName ?: "(empty)"} mail=${me?.mailAddress ?: "(empty)"}",
+            )
+            if (me == null || me.id.isBlank()) {
+                PrSuggestionLog.d("repo: abort — could not resolve authenticated user from connectiondata (check PAT / org).")
+                return@runCatching null
+            }
+            val projects =
+                if (!projectName.isNullOrBlank()) {
+                    listOf(projectName)
+                } else {
+                    listProjects(organization).getOrDefault(emptyList()).map { it.name }.take(10)
+                }
+            PrSuggestionLog.d("repo: scanning projects (${projects.size}): ${projects.joinToString()}")
+            if (projects.isEmpty()) {
+                PrSuggestionLog.d("repo: abort — no projects to scan.")
+                return@runCatching null
+            }
+
+            val existingSourceRefs =
+                projects.flatMap { prj ->
+                    getMyPullRequests(organization, prj).getOrDefault(emptyList())
+                }.map { normalizeBranchRef(it.sourceRefName) }.toSet()
+            PrSuggestionLog.d("repo: my active PR source branches (${existingSourceRefs.size}): ${existingSourceRefs.take(15).joinToString()}")
+
+            var best: PullRequestBranchRef? = null
+            var bestProjectName: String? = null
+            var totalBranchesSeen = 0
+            var branchesWithCreator = 0
+            var branchesMatchingMe = 0
+            projects.forEach { prj ->
+                val repositories = listRepositories(organization, prj).getOrDefault(emptyList())
+                PrSuggestionLog.d("repo: project=$prj repositories=${repositories.size}")
+                repositories.forEach { repo ->
+                    val branches = listBranches(organization, prj, repo.id).getOrDefault(emptyList())
+                    totalBranchesSeen += branches.size
+                    branches.forEach { branch ->
+                        if (!branch.creatorId.isNullOrBlank() || !branch.creatorUniqueName.isNullOrBlank()) branchesWithCreator++
+                        val matchesMe = branchMatchesAuthenticatedUser(branch, me)
+                        if (matchesMe) branchesMatchingMe++
+                        if (!matchesMe) return@forEach
+                        if (branch.name.equals("main", ignoreCase = true) || branch.name.equals("master", ignoreCase = true)) return@forEach
+                        val normalized = normalizeBranchRef(branch.name)
+                        if (normalized in existingSourceRefs) {
+                            PrSuggestionLog.d("repo: skip branch=${branch.name} — already has active PR from me")
+                            return@forEach
+                        }
+                        val currentBestDate = best?.latestUpdateDateIso.orEmpty()
+                        val candidateDate = branch.latestUpdateDateIso.orEmpty()
+                        if (best == null || candidateDate > currentBestDate) {
+                            best = branch
+                            bestProjectName = prj
+                            PrSuggestionLog.d(
+                                "repo: candidate branch=${branch.name} repo=${branch.repositoryName} " +
+                                    "updated=${branch.latestUpdateDateIso ?: "no status date"}",
+                            )
+                        }
+                    }
+                }
+            }
+            PrSuggestionLog.d(
+                "repo: summary totalRefs=$totalBranchesSeen refsWithCreatorField=$branchesWithCreator refsMatchingMe=$branchesMatchingMe",
+            )
+            val suggestionBranch = best ?: run {
+                PrSuggestionLog.d(
+                    "repo: no suggestion — no branch passed filters (creator must match you, not main/master, no active PR). " +
+                        "If refsWithCreatorField=0, ADO may not populate creator on refs; check API response.",
+                )
+                return@runCatching null
+            }
+            PullRequestSuggestion(
+                projectName = bestProjectName.orEmpty(),
+                repositoryId = suggestionBranch.repositoryId,
+                repositoryName = suggestionBranch.repositoryName,
+                sourceBranchName = suggestionBranch.name,
+                targetBranchName = "main",
+            )
+        }
+
+    override suspend fun createPullRequest(params: CreatePullRequestParams): Result<CreatedPullRequest> =
+        runCatching {
+            require(params.organization.isNotBlank()) { "Missing organization." }
+            require(params.projectName.isNotBlank()) { "Missing project name." }
+            require(params.repositoryId.isNotBlank()) { "Missing repository id." }
+            require(params.sourceBranchName.isNotBlank()) { "Missing source branch." }
+            require(params.targetBranchName.isNotBlank()) { "Missing target branch." }
+            require(params.title.isNotBlank()) { "Missing title." }
+            val url =
+                "https://$Host/${params.organization.encodeURLPathPart()}/${params.projectName.encodeURLPathPart()}/" +
+                    "_apis/git/repositories/${params.repositoryId.encodeURLPathPart()}/pullrequests?api-version=$ApiVersion"
+            val response = httpClient.request(url) {
+                method = HttpMethod.Post
+                headers.append(HttpHeaders.Authorization, basicAuth())
+                setBody(
+                    TextContent(
+                        text =
+                            """{"sourceRefName":"${fullRef(params.sourceBranchName)}","targetRefName":"${fullRef(params.targetBranchName)}","title":"${params.title.escapeJson()}","description":"${params.description.escapeJson()}"}""",
+                        contentType = ContentType.Application.Json,
+                    ),
+                )
+            }
+            require(response.status.isSuccess()) {
+                "Unable to create pull request (${response.status.value})."
+            }
+            val root = json.parseToJsonElement(response.bodyAsText()).jsonObject
+            val pullRequestId = root["pullRequestId"].intOrNull() ?: error("Invalid create pull request response.")
+            CreatedPullRequest(
+                pullRequestId = pullRequestId,
+                projectName = params.projectName,
+                repositoryId = params.repositoryId,
+            )
         }
 
     override suspend fun getPullRequestSummaryById(
@@ -177,6 +393,60 @@ class AdoPullRequestRepository(
             val id = obj["id"].stringOrNull() ?: return@mapNotNull null
             val name = obj["name"].stringOrNull() ?: return@mapNotNull null
             DevOpsProject(id = id, name = name)
+        }
+    }
+
+    private fun branchMatchesAuthenticatedUser(
+        branch: PullRequestBranchRef,
+        me: ConnectionAuthenticatedUser,
+    ): Boolean {
+        if (!branch.creatorId.isNullOrBlank() && branch.creatorId.equals(me.id, ignoreCase = true)) return true
+        if (!me.uniqueName.isNullOrBlank() && branch.creatorUniqueName.equals(me.uniqueName, ignoreCase = true)) {
+            return true
+        }
+        if (!me.mailAddress.isNullOrBlank() && !branch.creatorMailAddress.isNullOrBlank() &&
+            branch.creatorMailAddress.equals(me.mailAddress, ignoreCase = true)
+        ) {
+            return true
+        }
+        return false
+    }
+
+    private fun parseRepositories(raw: String): List<PullRequestRepositoryRef> {
+        val root = json.parseToJsonElement(raw).jsonObject
+        return root["value"].asArray().mapNotNull { element ->
+            val obj = element.asObjectOrNull() ?: return@mapNotNull null
+            val id = obj["id"].stringOrNull() ?: return@mapNotNull null
+            val name = obj["name"].stringOrNull() ?: return@mapNotNull null
+            val projectName = obj["project"].asObjectOrNull()?.get("name").stringOrNull() ?: return@mapNotNull null
+            PullRequestRepositoryRef(id = id, name = name, projectName = projectName)
+        }
+    }
+
+    private fun parseBranches(raw: String): List<PullRequestBranchRef> {
+        val root = json.parseToJsonElement(raw).jsonObject
+        return root["value"].asArray().mapNotNull { element ->
+            val obj = element.asObjectOrNull() ?: return@mapNotNull null
+            val name = obj["name"].stringOrNull()?.substringAfter("refs/heads/") ?: return@mapNotNull null
+            val repository = obj["repository"].asObjectOrNull() ?: return@mapNotNull null
+            val creator =
+                obj["creator"].asObjectOrNull()
+                    ?: obj["createdBy"].asObjectOrNull()
+            PullRequestBranchRef(
+                repositoryId = repository["id"].stringOrNull().orEmpty(),
+                repositoryName = repository["name"].stringOrNull().orEmpty(),
+                name = name,
+                creatorId = creator?.get("id").stringOrNull(),
+                creatorUniqueName = creator?.get("uniqueName").stringOrNull(),
+                creatorMailAddress = creator?.get("mailAddress").stringOrNull(),
+                latestUpdateDateIso =
+                    obj["statuses"]
+                        .asArray()
+                        .firstOrNull()
+                        ?.asObjectOrNull()
+                        ?.get("creationDate")
+                        .stringOrNull(),
+            )
         }
     }
 
@@ -626,3 +896,17 @@ private fun JsonElement?.jsonBooleanOrNull(): Boolean? {
         else -> null
     }
 }
+
+private fun normalizeBranchRef(value: String): String = value.removePrefix("refs/heads/").trim()
+
+private fun fullRef(value: String): String {
+    val trimmed = value.trim()
+    return if (trimmed.startsWith("refs/heads/")) trimmed else "refs/heads/$trimmed"
+}
+
+private fun String.escapeJson(): String =
+    replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\t", "\\t")

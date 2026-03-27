@@ -7,6 +7,24 @@ interface PullRequestRepository {
 
     suspend fun getActivePullRequests(organization: String, projectName: String?): Result<List<PullRequestSummary>>
 
+    suspend fun listRepositories(
+        organization: String,
+        projectName: String,
+    ): Result<List<PullRequestRepositoryRef>>
+
+    suspend fun listBranches(
+        organization: String,
+        projectName: String,
+        repositoryId: String,
+    ): Result<List<PullRequestBranchRef>>
+
+    suspend fun findCreatePullRequestSuggestion(
+        organization: String,
+        projectName: String?,
+    ): Result<PullRequestSuggestion?>
+
+    suspend fun createPullRequest(params: CreatePullRequestParams): Result<CreatedPullRequest>
+
     /**
      * Fetch a pull request directly by id (works for completed/abandoned too).
      *

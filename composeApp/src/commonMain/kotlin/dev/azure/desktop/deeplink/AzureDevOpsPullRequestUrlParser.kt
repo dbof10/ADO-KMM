@@ -1,5 +1,47 @@
 package dev.azure.desktop.deeplink
 
+private const val DevAzureHost = "dev.azure.com"
+
+/**
+ * Builds the browser URL for a pull request on dev.azure.com, matching
+ * [parseAzureDevOpsPullRequestUrl].
+ */
+fun azureDevOpsPullRequestWebUrl(
+    organization: String,
+    projectName: String,
+    repositoryName: String,
+    pullRequestId: Int,
+): String {
+    val org = encodeUrlPathSegment(organization.trim())
+    val project = encodeUrlPathSegment(projectName.trim())
+    val repo = encodeUrlPathSegment(repositoryName.trim())
+    return "https://$DevAzureHost/$org/$project/_git/$repo/pullrequest/$pullRequestId"
+}
+
+/** Percent-encodes a single path segment (UTF-8), aligned with typical dev.azure.com URLs. */
+internal fun encodeUrlPathSegment(value: String): String {
+    val utf8 = value.encodeToByteArray()
+    return buildString(utf8.size + 8) {
+        for (b in utf8) {
+            val c = b.toInt() and 0xFF
+            when (c) {
+                in 'a'.code..'z'.code,
+                in 'A'.code..'Z'.code,
+                in '0'.code..'9'.code,
+                '-'.code,
+                '_'.code,
+                '.'.code,
+                '~'.code,
+                -> append(c.toChar())
+                else -> {
+                    append('%')
+                    append(c.toString(16).uppercase().padStart(2, '0'))
+                }
+            }
+        }
+    }
+}
+
 /** Parsed Azure DevOps web URL for a pull request (dev.azure.com). */
 data class AzureDevOpsPullRequestLink(
     val organization: String,

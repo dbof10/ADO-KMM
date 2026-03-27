@@ -12,6 +12,10 @@ import dev.azure.desktop.domain.pr.GetPullRequestDetailUseCase
 import dev.azure.desktop.domain.pr.GetPullRequestFileDiffUseCase
 import dev.azure.desktop.domain.pr.GetPullRequestLineStatsUseCase
 import dev.azure.desktop.domain.pr.GetPullRequestSummaryByIdUseCase
+import dev.azure.desktop.domain.pr.FindCreatePullRequestSuggestionUseCase
+import dev.azure.desktop.domain.pr.ListPullRequestRepositoriesUseCase
+import dev.azure.desktop.domain.pr.ListPullRequestBranchesUseCase
+import dev.azure.desktop.domain.pr.CreatePullRequestUseCase
 import dev.azure.desktop.domain.pr.ListProjectsUseCase
 import dev.azure.desktop.domain.pr.SetMyPullRequestVoteUseCase
 
@@ -64,6 +68,14 @@ object AndroidPullRequestServices {
     val getPullRequestSummaryByIdUseCase by lazy { GetPullRequestSummaryByIdUseCase(repository) }
 
     val setMyPullRequestVoteUseCase by lazy { SetMyPullRequestVoteUseCase(repository) }
+
+    val findCreatePullRequestSuggestionUseCase by lazy { FindCreatePullRequestSuggestionUseCase(repository) }
+
+    val listPullRequestRepositoriesUseCase by lazy { ListPullRequestRepositoriesUseCase(repository) }
+
+    val listPullRequestBranchesUseCase by lazy { ListPullRequestBranchesUseCase(repository) }
+
+    val createPullRequestUseCase by lazy { CreatePullRequestUseCase(repository) }
 
     suspend fun getPullRequestChanges(
         organization: String,

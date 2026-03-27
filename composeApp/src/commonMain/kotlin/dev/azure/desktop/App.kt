@@ -224,8 +224,15 @@ fun App() {
                     onSignOut = signOut,
                     content = {
                         PrListScreen(
+                            organization = organization,
                             stateMachine = prListStateMachine,
                             listState = prListUiState,
+                            listPullRequestRepositories = { org, project ->
+                                pullRequestBridge.listPullRequestRepositoriesUseCase(org, project)
+                            },
+                            createPullRequest = { params ->
+                                pullRequestBridge.createPullRequestUseCase(params)
+                            },
                             onOpenPullRequest = {
                                 selectedPullRequest = it
                                 screen.value = AppScreen.PrDetail
@@ -268,6 +275,7 @@ fun App() {
                                         Text("Unable to open pull request.")
                                     } else {
                                         PrOverviewScreen(
+                                            organization = organization,
                                             detail = current.detail,
                                             codeReviewStateMachine = reviewMachine,
                                             isVoting = current.isVoting,

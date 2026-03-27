@@ -20,6 +20,47 @@ data class PullRequestSummary(
     val creationDateIso: String?,
 )
 
+data class PullRequestRepositoryRef(
+    val id: String,
+    val name: String,
+    val projectName: String,
+)
+
+data class PullRequestBranchRef(
+    val repositoryId: String,
+    val repositoryName: String,
+    val name: String,
+    /** Present when ADO populates IdentityRef on the ref (matches connectiondata `authenticatedUser.id`). */
+    val creatorId: String?,
+    val creatorUniqueName: String?,
+    val creatorMailAddress: String?,
+    val latestUpdateDateIso: String?,
+)
+
+data class PullRequestSuggestion(
+    val projectName: String,
+    val repositoryId: String,
+    val repositoryName: String,
+    val sourceBranchName: String,
+    val targetBranchName: String,
+)
+
+data class CreatePullRequestParams(
+    val organization: String,
+    val projectName: String,
+    val repositoryId: String,
+    val sourceBranchName: String,
+    val targetBranchName: String,
+    val title: String,
+    val description: String,
+)
+
+data class CreatedPullRequest(
+    val pullRequestId: Int,
+    val projectName: String,
+    val repositoryId: String,
+)
+
 data class PullRequestDetail(
     val summary: PullRequestSummary,
     val description: String?,
