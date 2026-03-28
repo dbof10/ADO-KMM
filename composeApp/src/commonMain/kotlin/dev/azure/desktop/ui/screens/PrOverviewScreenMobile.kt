@@ -12,9 +12,12 @@ internal fun PrOverviewScreenMobile(
     codeReviewStateMachine: CodeReviewStateMachine,
     isVoting: Boolean,
     voteErrorMessage: String?,
+    isClosing: Boolean,
+    closeErrorMessage: String?,
     onBack: () -> Unit,
     onApprove: () -> Unit,
     onReject: () -> Unit,
+    onClosePr: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     PrOverviewScreenContent(
@@ -23,9 +26,12 @@ internal fun PrOverviewScreenMobile(
         codeReviewStateMachine = codeReviewStateMachine,
         isVoting = isVoting,
         voteErrorMessage = voteErrorMessage,
+        isClosing = isClosing,
+        closeErrorMessage = closeErrorMessage,
         onBack = onBack,
         onApprove = onApprove,
         onReject = onReject,
+        onClosePr = onClosePr,
         modifier = modifier,
         compactLayout = true,
     )

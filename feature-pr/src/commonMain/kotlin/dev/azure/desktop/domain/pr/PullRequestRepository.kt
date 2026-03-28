@@ -78,4 +78,20 @@ interface PullRequestRepository {
         pullRequestId: Int,
         vote: Int,
     ): Result<Unit>
+
+    /**
+     * Closes an active pull request by abandoning it (Azure DevOps `status`: `abandoned`).
+     */
+    suspend fun abandonPullRequest(
+        organization: String,
+        projectName: String,
+        repositoryId: String,
+        pullRequestId: Int,
+    ): Result<Unit>
+
+    /**
+     * Loads binary content from a signed-in Azure DevOps HTTPS URL (e.g. PR comment image attachments).
+     * Only `https://dev.azure.com/...` is accepted.
+     */
+    suspend fun fetchAuthenticatedDevOpsResource(url: String): Result<ByteArray>
 }

@@ -25,6 +25,9 @@ class PullRequestUseCasesCoreTest {
 
         assertTrue(SetMyPullRequestVoteUseCase(repository)(" org ", "project", "repo", 7, 10).isSuccess)
         assertEquals(10, repository.lastVote)
+
+        assertTrue(AbandonPullRequestUseCase(repository)(" org ", "project", "repo", 7).isSuccess)
+        assertEquals(7, repository.lastAbandonPullRequestId)
     }
 }
 
@@ -32,6 +35,7 @@ private class RecordingPullRequestRepository : PullRequestRepository {
     var lastOrganization: String? = null
     var lastProjectName: String? = null
     var lastPullRequestId: Int? = null
+    var lastAbandonPullRequestId: Int? = null
     var lastVote: Int? = null
 
     override suspend fun listProjects(organization: String): Result<List<DevOpsProject>> {
@@ -50,6 +54,25 @@ private class RecordingPullRequestRepository : PullRequestRepository {
         lastProjectName = projectName
         return Result.success(emptyList())
     }
+
+    override suspend fun listRepositories(
+        organization: String,
+        projectName: String,
+    ): Result<List<PullRequestRepositoryRef>> = Result.success(emptyList())
+
+    override suspend fun listBranches(
+        organization: String,
+        projectName: String,
+        repositoryId: String,
+    ): Result<List<PullRequestBranchRef>> = Result.success(emptyList())
+
+    override suspend fun findCreatePullRequestSuggestion(
+        organization: String,
+        projectName: String?,
+    ): Result<PullRequestSuggestion?> = Result.success(null)
+
+    override suspend fun createPullRequest(params: CreatePullRequestParams): Result<CreatedPullRequest> =
+        Result.failure(NotImplementedError("unused"))
 
     override suspend fun getPullRequestSummaryById(
         organization: String,
@@ -114,4 +137,20 @@ private class RecordingPullRequestRepository : PullRequestRepository {
         lastVote = vote
         return Result.success(Unit)
     }
+
+    override suspend fun abandonPullRequest(
+        organization: String,
+        projectName: String,
+        repositoryId: String,
+        pullRequestId: Int,
+    ): Result<Unit> {
+        lastOrganization = organization
+        lastProjectName = projectName
+        lastPullRequestId = pullRequestId
+        lastAbandonPullRequestId = pullRequestId
+        return Result.success(Unit)
+    }
+
+    override suspend fun fetchAuthenticatedDevOpsResource(url: String): Result<ByteArray> =
+        Result.failure(NotImplementedError("unused"))
 }

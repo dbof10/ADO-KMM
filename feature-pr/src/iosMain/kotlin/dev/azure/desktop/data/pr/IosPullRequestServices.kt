@@ -16,6 +16,7 @@ import dev.azure.desktop.domain.pr.ListPullRequestRepositoriesUseCase
 import dev.azure.desktop.domain.pr.ListPullRequestBranchesUseCase
 import dev.azure.desktop.domain.pr.CreatePullRequestUseCase
 import dev.azure.desktop.domain.pr.ListProjectsUseCase
+import dev.azure.desktop.domain.pr.AbandonPullRequestUseCase
 import dev.azure.desktop.domain.pr.SetMyPullRequestVoteUseCase
 
 object IosPullRequestServices {
@@ -66,6 +67,8 @@ object IosPullRequestServices {
 
     val setMyPullRequestVoteUseCase by lazy { SetMyPullRequestVoteUseCase(repository) }
 
+    val abandonPullRequestUseCase by lazy { AbandonPullRequestUseCase(repository) }
+
     val findCreatePullRequestSuggestionUseCase by lazy { FindCreatePullRequestSuggestionUseCase(repository) }
 
     val listPullRequestRepositoriesUseCase by lazy { ListPullRequestRepositoriesUseCase(repository) }
@@ -82,4 +85,6 @@ object IosPullRequestServices {
         baseCommitId: String,
         targetCommitId: String,
     ) = repository.getPullRequestChanges(organization, projectName, repositoryId, pullRequestId, baseCommitId, targetCommitId)
+
+    suspend fun fetchAuthenticatedDevOpsResource(url: String) = repository.fetchAuthenticatedDevOpsResource(url)
 }

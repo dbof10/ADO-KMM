@@ -20,6 +20,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.request
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsBytes
 import io.ktor.client.statement.bodyAsText
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
@@ -674,6 +675,58 @@ class AdoPullRequestRepository(
                 "Unable to update vote (${response.status.value})."
             }
         }
+
+    override suspend fun abandonPullRequest(
+        organization: String,
+        projectName: String,
+        repositoryId: String,
+        pullRequestId: Int,
+    ): Result<Unit> =
+        runCatching {
+            require(organization.isNotBlank()) { "Missing organization." }
+            require(projectName.isNotBlank()) { "Missing project name." }
+            require(repositoryId.isNotBlank()) { "Missing repository id." }
+            require(pullRequestId > 0) { "Invalid pull request id." }
+
+            val url =
+                "https://$Host/${organization.encodeURLPathPart()}/${projectName.encodeURLPathPart()}/" +
+                    "_apis/git/repositories/${repositoryId.encodeURLPathPart()}/pullRequests/$pullRequestId" +
+                    "?api-version=$ApiVersion"
+
+            val response =
+                httpClient.request(url) {
+                    method = HttpMethod.Patch
+                    headers.append(HttpHeaders.Authorization, basicAuth())
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"status":"abandoned"}""")
+                }
+
+            require(response.status.isSuccess()) {
+                "Unable to close pull request (${response.status.value})."
+            }
+        }
+
+    override suspend fun fetchAuthenticatedDevOpsResource(url: String): Result<ByteArray> =
+        runCatching {
+            val trimmed = url.trim()
+            require(isPermittedAuthenticatedDevOpsUrl(trimmed)) {
+                "Only https://$Host URLs can be loaded."
+            }
+            val response =
+                httpClient.get(trimmed) {
+                    headers.append(HttpHeaders.Authorization, basicAuth())
+                }
+            require(response.status.isSuccess()) {
+                "Unable to load resource (${response.status.value})."
+            }
+            response.bodyAsBytes()
+        }
+
+    private fun isPermittedAuthenticatedDevOpsUrl(url: String): Boolean {
+        if (url.isEmpty()) return false
+        val lower = url.lowercase()
+        return lower.startsWith("https://$Host/")
+    }
 
     private fun basicAuth(): String {
         val pat = patProvider()?.trim().orEmpty()

@@ -125,6 +125,25 @@ private class DiffRepository : PullRequestRepository {
         projectName: String?,
     ): Result<List<PullRequestSummary>> = Result.failure(NotImplementedError("unused"))
 
+    override suspend fun listRepositories(
+        organization: String,
+        projectName: String,
+    ): Result<List<PullRequestRepositoryRef>> = Result.failure(NotImplementedError("unused"))
+
+    override suspend fun listBranches(
+        organization: String,
+        projectName: String,
+        repositoryId: String,
+    ): Result<List<PullRequestBranchRef>> = Result.failure(NotImplementedError("unused"))
+
+    override suspend fun findCreatePullRequestSuggestion(
+        organization: String,
+        projectName: String?,
+    ): Result<PullRequestSuggestion?> = Result.failure(NotImplementedError("unused"))
+
+    override suspend fun createPullRequest(params: CreatePullRequestParams): Result<CreatedPullRequest> =
+        Result.failure(NotImplementedError("unused"))
+
     override suspend fun getPullRequestSummaryById(
         organization: String,
         projectName: String,
@@ -169,6 +188,16 @@ private class DiffRepository : PullRequestRepository {
         pullRequestId: Int,
         vote: Int,
     ): Result<Unit> = Result.failure(NotImplementedError("unused"))
+
+    override suspend fun abandonPullRequest(
+        organization: String,
+        projectName: String,
+        repositoryId: String,
+        pullRequestId: Int,
+    ): Result<Unit> = Result.failure(NotImplementedError("unused"))
+
+    override suspend fun fetchAuthenticatedDevOpsResource(url: String): Result<ByteArray> =
+        Result.failure(NotImplementedError("unused"))
 }
 
 private fun sampleDetail(): PullRequestDetail =

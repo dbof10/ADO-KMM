@@ -1,5 +1,6 @@
 package dev.azure.desktop.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,7 +33,9 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,17 +49,24 @@ import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.azure.desktop.domain.pr.PullRequestDetail
@@ -65,6 +76,7 @@ import dev.azure.desktop.domain.pr.PullRequestLinkedWorkItem
 import dev.azure.desktop.domain.pr.PullRequestReviewer
 import dev.azure.desktop.domain.pr.PullRequestTimelineItem
 import dev.azure.desktop.deeplink.azureDevOpsPullRequestWebUrl
+import dev.azure.desktop.platform.pullRequestBridge
 import dev.azure.desktop.pr.review.CodeReviewStateMachine
 import dev.azure.desktop.theme.EditorialColors
 import dev.azure.desktop.ui.adaptive.LayoutClass
@@ -79,9 +91,12 @@ fun PrOverviewScreen(
     codeReviewStateMachine: CodeReviewStateMachine,
     isVoting: Boolean,
     voteErrorMessage: String?,
+    isClosing: Boolean,
+    closeErrorMessage: String?,
     onBack: () -> Unit,
     onApprove: () -> Unit,
     onReject: () -> Unit,
+    onClosePr: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(
@@ -97,9 +112,12 @@ fun PrOverviewScreen(
                 codeReviewStateMachine = codeReviewStateMachine,
                 isVoting = isVoting,
                 voteErrorMessage = voteErrorMessage,
+                isClosing = isClosing,
+                closeErrorMessage = closeErrorMessage,
                 onBack = onBack,
                 onApprove = onApprove,
                 onReject = onReject,
+                onClosePr = onClosePr,
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
@@ -109,9 +127,12 @@ fun PrOverviewScreen(
                 codeReviewStateMachine = codeReviewStateMachine,
                 isVoting = isVoting,
                 voteErrorMessage = voteErrorMessage,
+                isClosing = isClosing,
+                closeErrorMessage = closeErrorMessage,
                 onBack = onBack,
                 onApprove = onApprove,
                 onReject = onReject,
+                onClosePr = onClosePr,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -125,13 +146,17 @@ internal fun PrOverviewScreenContent(
     codeReviewStateMachine: CodeReviewStateMachine,
     isVoting: Boolean,
     voteErrorMessage: String?,
+    isClosing: Boolean,
+    closeErrorMessage: String?,
     onBack: () -> Unit,
     onApprove: () -> Unit,
     onReject: () -> Unit,
+    onClosePr: () -> Unit,
     modifier: Modifier = Modifier,
     compactLayout: Boolean,
 ) {
     val summary = detail.summary
+    val reviewActionsEnabled = summary.status.equals("active", ignoreCase = true) && !isVoting && !isClosing
     val clipboard = LocalClipboardManager.current
     val prWebUrl =
         azureDevOpsPullRequestWebUrl(
@@ -215,49 +240,67 @@ internal fun PrOverviewScreenContent(
                             )
                             Text(summary.creatorDisplayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                         }
-                        Text(
-                            "wants to merge into ${summary.targetRefName.substringAfterLast("/")}" +
-                                " from ${summary.sourceRefName.substringAfterLast("/")}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = EditorialColors.onSurfaceVariant,
+                        MergeBranchLine(
+                            targetRefName = summary.targetRefName,
+                            sourceRefName = summary.sourceRefName,
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 } else {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
                         Box(
                             modifier = Modifier
                                 .size(20.dp)
                                 .clip(CircleShape)
                                 .background(EditorialColors.primaryContainer),
                         )
-                        Text(summary.creatorDisplayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                        Text(
-                            "wants to merge into ${summary.targetRefName.substringAfterLast("/")}" +
-                                " from ${summary.sourceRefName.substringAfterLast("/")}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = EditorialColors.onSurfaceVariant,
-                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(summary.creatorDisplayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            MergeBranchLine(
+                                targetRefName = summary.targetRefName,
+                                sourceRefName = summary.sourceRefName,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.height(16.dp))
                 if (compactLayout) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        OutlinedButton(
-                            onClick = onReject,
-                            enabled = !isVoting,
-                            modifier = Modifier.weight(1f),
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            Text("Reject")
+                            OutlinedButton(
+                                onClick = onReject,
+                                enabled = reviewActionsEnabled,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text("Reject")
+                            }
+                            Button(
+                                onClick = onApprove,
+                                enabled = reviewActionsEnabled,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text("Approve")
+                            }
                         }
-                        Button(
-                            onClick = onApprove,
-                            enabled = !isVoting,
-                            modifier = Modifier.weight(1f),
+                        TextButton(
+                            onClick = onClosePr,
+                            enabled = reviewActionsEnabled,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors =
+                                ButtonDefaults.textButtonColors(
+                                    contentColor = EditorialColors.error,
+                                    disabledContentColor = EditorialColors.outline,
+                                ),
                         ) {
-                            Text("Approve")
+                            Text(if (isClosing) "Closing…" else "Close PR")
                         }
                     }
                 } else {
@@ -265,16 +308,27 @@ internal fun PrOverviewScreenContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End,
                     ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(
+                                onClick = onClosePr,
+                                enabled = reviewActionsEnabled,
+                                colors =
+                                    ButtonDefaults.textButtonColors(
+                                        contentColor = EditorialColors.error,
+                                        disabledContentColor = EditorialColors.outline,
+                                    ),
+                            ) {
+                                Text(if (isClosing) "Closing…" else "Close PR")
+                            }
                             OutlinedButton(
                                 onClick = onReject,
-                                enabled = !isVoting,
+                                enabled = reviewActionsEnabled,
                             ) {
                                 Text("Reject")
                             }
                             Button(
                                 onClick = onApprove,
-                                enabled = !isVoting,
+                                enabled = reviewActionsEnabled,
                             ) {
                                 Text("Approve")
                             }
@@ -285,6 +339,14 @@ internal fun PrOverviewScreenContent(
                     Spacer(Modifier.height(8.dp))
                     Text(
                         voteErrorMessage,
+                        color = EditorialColors.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                if (!closeErrorMessage.isNullOrBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        closeErrorMessage,
                         color = EditorialColors.error,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -363,6 +425,36 @@ internal fun PrOverviewScreenContent(
 }
 
 @Composable
+private fun MergeBranchLine(
+    targetRefName: String,
+    sourceRefName: String,
+    modifier: Modifier = Modifier,
+) {
+    val targetBranch = targetRefName.substringAfterLast("/")
+    val sourceBranch = sourceRefName.substringAfterLast("/")
+    val baseStyle = SpanStyle(color = EditorialColors.onSurfaceVariant)
+    val branchStyle =
+        SpanStyle(
+            color = EditorialColors.primary,
+            fontWeight = FontWeight.SemiBold,
+        )
+    val annotated =
+        buildAnnotatedString {
+            withStyle(baseStyle) { append("wants to merge into ") }
+            withStyle(branchStyle) { append(targetBranch) }
+            withStyle(baseStyle) { append(" from ") }
+            withStyle(branchStyle) { append(sourceBranch) }
+        }
+    Text(
+        annotated,
+        modifier = modifier,
+        style = MaterialTheme.typography.bodySmall,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Composable
 private fun DescriptionCard(description: String?, compactLayout: Boolean) {
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -414,11 +506,15 @@ private fun ActivityTimeline(items: List<PullRequestTimelineItem>, compactLayout
 
 @Composable
 private fun TimelineComment(item: PullRequestTimelineItem.Comment, compactLayout: Boolean) {
+    val isSystemActor = isMicrosoftSystemTimelineActor(item.actorDisplayName)
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Icon(Icons.Outlined.ModeComment, null, tint = EditorialColors.outline, modifier = Modifier.size(18.dp))
         Card(colors = CardDefaults.cardColors(containerColor = EditorialColors.surfaceContainerLowest), shape = RoundedCornerShape(12.dp)) {
             Column(Modifier.padding(16.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = if (isSystemActor) Arrangement.Start else Arrangement.SpaceBetween,
+                ) {
                     if (compactLayout) {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(item.actorDisplayName.ifBlank { "Unknown" }, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
@@ -434,22 +530,126 @@ private fun TimelineComment(item: PullRequestTimelineItem.Comment, compactLayout
                             }
                         }
                     }
-                    Icon(Icons.Outlined.MoreHoriz, null, tint = EditorialColors.outline)
+                    if (!isSystemActor) {
+                        Icon(Icons.Outlined.MoreHoriz, null, tint = EditorialColors.outline)
+                    }
                 }
                 Spacer(Modifier.height(8.dp))
-                Text(
-                    formatTimelineContent(item.content),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = EditorialColors.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { }) { Text("Reply", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = EditorialColors.primary) }
-                    TextButton(onClick = { }) { Text("Resolve", fontSize = 11.sp, color = EditorialColors.outline) }
+                TimelineCommentBody(item.content)
+                if (!isSystemActor) {
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { }) { Text("Reply", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = EditorialColors.primary) }
+                        TextButton(onClick = { }) { Text("Resolve", fontSize = 11.sp, color = EditorialColors.outline) }
+                    }
                 }
             }
         }
     }
+}
+
+private sealed class TimelineCommentPart {
+    data class Text(val value: String) : TimelineCommentPart()
+
+    data class Image(val alt: String, val url: String) : TimelineCommentPart()
+}
+
+@Composable
+private fun TimelineCommentBody(content: String) {
+    val parts = remember(content) { parseTimelineCommentParts(content) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        parts.forEach { part ->
+            when (part) {
+                is TimelineCommentPart.Text ->
+                    if (part.value.isNotBlank()) {
+                        Text(
+                            part.value,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = EditorialColors.onSurfaceVariant,
+                        )
+                    }
+
+                is TimelineCommentPart.Image ->
+                    TimelineCommentMarkdownImage(url = part.url, alt = part.alt)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TimelineCommentMarkdownImage(url: String, alt: String) {
+    var bitmap by remember(url) { mutableStateOf<ImageBitmap?>(null) }
+    var loading by remember(url) { mutableStateOf(true) }
+    LaunchedEffect(url) {
+        loading = true
+        bitmap = null
+        val bytes = pullRequestBridge.fetchAuthenticatedDevOpsResource(url).getOrNull()
+        bitmap = bytes?.decodeTimelineImageOrNull()
+        loading = false
+    }
+    val description = alt.ifBlank { "Comment image" }
+    val decoded = bitmap
+    when {
+        loading ->
+            CircularProgressIndicator(
+                modifier = Modifier.size(22.dp),
+                strokeWidth = 2.dp,
+                color = EditorialColors.primary,
+            )
+
+        decoded != null ->
+            Image(
+                bitmap = decoded,
+                contentDescription = description,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 360.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Fit,
+            )
+
+        else ->
+            Text(
+                "![$alt]($url)",
+                style = MaterialTheme.typography.bodySmall,
+                color = EditorialColors.outline,
+            )
+    }
+}
+
+private val markdownImageRegex = Regex("""!\[([^\]]*)\]\(([^)]+)\)""")
+
+private fun parseTimelineCommentParts(content: String): List<TimelineCommentPart> {
+    if (!markdownImageRegex.containsMatchIn(content)) {
+        return listOf(TimelineCommentPart.Text(formatTimelineContent(content)))
+    }
+    val parts = mutableListOf<TimelineCommentPart>()
+    var i = 0
+    for (match in markdownImageRegex.findAll(content)) {
+        if (match.range.first > i) {
+            val slice = content.substring(i, match.range.first)
+            if (slice.isNotEmpty()) {
+                parts += TimelineCommentPart.Text(formatTimelineContent(slice))
+            }
+        }
+        parts += TimelineCommentPart.Image(alt = match.groupValues[1], url = match.groupValues[2].trim())
+        i = match.range.last + 1
+    }
+    if (i < content.length) {
+        val tail = content.substring(i)
+        if (tail.isNotEmpty()) {
+            parts += TimelineCommentPart.Text(formatTimelineContent(tail))
+        }
+    }
+    return parts
+}
+
+/** Azure DevOps posts reviewer join/vote system lines under identities like [Microsoft.VisualStudio.Services.TFS]. */
+private fun isMicrosoftSystemTimelineActor(displayName: String): Boolean {
+    val name = displayName.trim()
+    if (name.isEmpty()) return false
+    return name.startsWith("Microsoft.", ignoreCase = true)
 }
 
 private val voteLineRegex = Regex("""\bvoted\s+(-?\d+)\b""", RegexOption.IGNORE_CASE)

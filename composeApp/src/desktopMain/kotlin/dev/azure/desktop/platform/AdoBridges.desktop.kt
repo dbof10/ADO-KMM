@@ -34,6 +34,7 @@ actual val pullRequestBridge: PullRequestBridge =
         override val createPullRequestUseCase get() = JvmPullRequestServices.createPullRequestUseCase
         override val getPullRequestDetailUseCase get() = JvmPullRequestServices.getPullRequestDetailUseCase
         override val setMyPullRequestVoteUseCase get() = JvmPullRequestServices.setMyPullRequestVoteUseCase
+        override val abandonPullRequestUseCase get() = JvmPullRequestServices.abandonPullRequestUseCase
         override val getPullRequestFileDiffUseCase get() = JvmPullRequestServices.getPullRequestFileDiffUseCase
 
         override suspend fun getPullRequestChanges(
@@ -51,6 +52,9 @@ actual val pullRequestBridge: PullRequestBridge =
             baseCommitId = baseCommitId,
             targetCommitId = targetCommitId,
         )
+
+        override suspend fun fetchAuthenticatedDevOpsResource(url: String) =
+            JvmPullRequestServices.fetchAuthenticatedDevOpsResource(url)
     }
 
 actual val releaseBridge: ReleaseBridge =

@@ -84,6 +84,7 @@ fun App() {
                     summary = it,
                     getPullRequestDetailUseCase = pullRequestBridge.getPullRequestDetailUseCase,
                     setMyPullRequestVoteUseCase = pullRequestBridge.setMyPullRequestVoteUseCase,
+                    abandonPullRequestUseCase = pullRequestBridge.abandonPullRequestUseCase,
                 )
             }
         }
@@ -280,12 +281,15 @@ fun App() {
                                             codeReviewStateMachine = reviewMachine,
                                             isVoting = current.isVoting,
                                             voteErrorMessage = current.voteErrorMessage,
+                                            isClosing = current.isClosing,
+                                            closeErrorMessage = current.closeErrorMessage,
                                             onBack = {
                                                 selectedPullRequest = null
                                                 screen.value = AppScreen.PrList
                                             },
                                             onApprove = { scope.launch { detailMachine.dispatch(PrDetailAction.Approve) } },
                                             onReject = { scope.launch { detailMachine.dispatch(PrDetailAction.Reject) } },
+                                            onClosePr = { scope.launch { detailMachine.dispatch(PrDetailAction.Close) } },
                                             modifier = Modifier.fillMaxSize(),
                                         )
                                     }

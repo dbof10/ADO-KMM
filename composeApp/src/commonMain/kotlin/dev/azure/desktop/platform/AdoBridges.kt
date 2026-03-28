@@ -17,6 +17,7 @@ import dev.azure.desktop.domain.pr.ListPullRequestBranchesUseCase
 import dev.azure.desktop.domain.pr.CreatePullRequestUseCase
 import dev.azure.desktop.domain.pr.ListProjectsUseCase
 import dev.azure.desktop.domain.pr.PullRequestChange
+import dev.azure.desktop.domain.pr.AbandonPullRequestUseCase
 import dev.azure.desktop.domain.pr.SetMyPullRequestVoteUseCase
 import dev.azure.desktop.domain.release.CreateReleaseUseCase
 import dev.azure.desktop.domain.release.DeployReleaseEnvironmentUseCase
@@ -47,6 +48,7 @@ interface PullRequestBridge {
     val createPullRequestUseCase: CreatePullRequestUseCase
     val getPullRequestDetailUseCase: GetPullRequestDetailUseCase
     val setMyPullRequestVoteUseCase: SetMyPullRequestVoteUseCase
+    val abandonPullRequestUseCase: AbandonPullRequestUseCase
     val getPullRequestFileDiffUseCase: GetPullRequestFileDiffUseCase
 
     suspend fun getPullRequestChanges(
@@ -57,6 +59,8 @@ interface PullRequestBridge {
         baseCommitId: String,
         targetCommitId: String,
     ): Result<List<PullRequestChange>>
+
+    suspend fun fetchAuthenticatedDevOpsResource(url: String): Result<ByteArray>
 }
 
 interface ReleaseBridge {
