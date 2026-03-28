@@ -7,8 +7,8 @@ import dev.azure.desktop.domain.pr.PullRequestChange
 import dev.azure.desktop.pr.StubPullRequestRepository
 import dev.azure.desktop.pr.samplePullRequestDetail
 import dev.azure.desktop.pr.samplePullRequestSummary
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -17,7 +17,7 @@ import kotlin.test.assertIs
 
 class CodeReviewStateMachineTest {
     @Test
-    fun initialLoadSelectsFirstFileWithDiff() =
+    fun initialLoadSelectsFirstFileWithDiff() {
         runBlocking {
             val repo = codeReviewRepo()
             val machine = createMachine(repo)
@@ -28,40 +28,56 @@ class CodeReviewStateMachineTest {
             assertEquals(false, c.isDiffLoading)
             assertEquals(2, c.changes.size)
         }
+    }
 
     @Test
-    fun selectFileLoadsDiffAsynchronously() =
+    fun selectFileLoadsDiffAsynchronously() {
         runBlocking {
             val repo = codeReviewRepo()
             val machine = createMachine(repo)
-            machine.state.first { it is CodeReviewState.Content }
-
-            launch { machine.dispatch(CodeReviewAction.SelectFile("src/B.kt")) }
-
+            var dispatched = false
             val loaded =
                 machine.state
-                    .filter {
+                    .onEach { s ->
+                        if (s is CodeReviewState.Content) {
+                            val c = s as CodeReviewState.Content
+                            if (!dispatched && c.selectedPath == "src/A.kt" && !c.isDiffLoading) {
+                                dispatched = true
+                                launch { machine.dispatch(CodeReviewAction.SelectFile("src/B.kt")) }
+                            }
+                        }
+                    }.first {
                         it is CodeReviewState.Content &&
                             (it as CodeReviewState.Content).selectedPath == "src/B.kt" &&
-                            !it.isDiffLoading &&
-                            it.diffLines.isNotEmpty()
-                    }.first()
+                            !(it as CodeReviewState.Content).isDiffLoading &&
+                            (it as CodeReviewState.Content).diffLines.isNotEmpty()
+                    }
             assertIs<CodeReviewState.Content>(loaded)
         }
+    }
 
     @Test
-    fun refreshReturnsToContent() =
+    fun refreshReturnsToContent() {
         runBlocking {
             val repo = codeReviewRepo()
             val machine = createMachine(repo)
-            machine.state.first { it is CodeReviewState.Content }
-
-            launch { machine.dispatch(CodeReviewAction.Refresh) }
-
-            machine.state.first { it is CodeReviewState.Loading }
-            val again = machine.state.first { it is CodeReviewState.Content }
+            var refreshDispatched = false
+            var sawLoadingAfterRefresh = false
+            val again =
+                machine.state
+                    .onEach { s ->
+                        if (s is CodeReviewState.Content && !refreshDispatched) {
+                            refreshDispatched = true
+                            launch { machine.dispatch(CodeReviewAction.Refresh) }
+                        }
+                        if (refreshDispatched && s is CodeReviewState.Loading) {
+                            sawLoadingAfterRefresh = true
+                        }
+                    }
+                    .first { it is CodeReviewState.Content && sawLoadingAfterRefresh }
             assertIs<CodeReviewState.Content>(again)
         }
+    }
 
     private fun createMachine(repo: StubPullRequestRepository): CodeReviewStateMachine {
         val summary = samplePullRequestSummary()

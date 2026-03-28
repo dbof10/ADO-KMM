@@ -8,8 +8,8 @@ import dev.azure.desktop.domain.pr.SetMyPullRequestVoteUseCase
 import dev.azure.desktop.pr.StubPullRequestRepository
 import dev.azure.desktop.pr.samplePullRequestDetail
 import dev.azure.desktop.pr.samplePullRequestSummary
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -17,7 +17,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 class PrDetailStateMachineTest {
     @Test
-    fun initialLoadShowsContent() =
+    fun initialLoadShowsContent() {
         runBlocking {
             val summary = samplePullRequestSummary()
             val detail = samplePullRequestDetail(summary = summary)
@@ -30,9 +30,10 @@ class PrDetailStateMachineTest {
             val content = machine.state.first { it is PrDetailState.Content }
             assertEquals(detail, assertIs<PrDetailState.Content>(content).detail)
         }
+    }
 
     @Test
-    fun initialLoadFailureShowsError() =
+    fun initialLoadFailureShowsError() {
         runBlocking {
             val summary = samplePullRequestSummary()
             val repo =
@@ -44,9 +45,10 @@ class PrDetailStateMachineTest {
             val err = machine.state.first { it is PrDetailState.Error }
             assertEquals("missing", assertIs<PrDetailState.Error>(err).message)
         }
+    }
 
     @Test
-    fun approveRefreshesDetailAfterVote() =
+    fun approveRefreshesDetailAfterVote() {
         runBlocking {
             val summary = samplePullRequestSummary()
             val initial = samplePullRequestDetail(summary = summary)
@@ -59,23 +61,29 @@ class PrDetailStateMachineTest {
                     detailResult = Result.success(initial)
                 }
             val machine = createMachine(repo, summary)
-            machine.state.first { it is PrDetailState.Content }
-
-            repo.detailResult = Result.success(refreshed)
-            launch { machine.dispatch(PrDetailAction.Approve) }
-
+            var dispatched = false
             val end =
                 machine.state
-                    .filter {
+                    .onEach { s ->
+                        if (s is PrDetailState.Content) {
+                            val c = s as PrDetailState.Content
+                            if (!dispatched && !c.isVoting && c.detail.summary.title != "Updated") {
+                                dispatched = true
+                                repo.detailResult = Result.success(refreshed)
+                                launch { machine.dispatch(PrDetailAction.Approve) }
+                            }
+                        }
+                    }.first {
                         it is PrDetailState.Content &&
                             !(it as PrDetailState.Content).isVoting &&
-                            it.detail.title == "Updated"
-                    }.first()
+                            (it as PrDetailState.Content).detail.summary.title == "Updated"
+                    }
             assertIs<PrDetailState.Content>(end)
         }
+    }
 
     @Test
-    fun voteFailureShowsVoteError() =
+    fun voteFailureShowsVoteError() {
         runBlocking {
             val summary = samplePullRequestSummary()
             val detail = samplePullRequestDetail(summary = summary)
@@ -85,21 +93,27 @@ class PrDetailStateMachineTest {
                     setVoteResult = Result.failure(Exception("no permission"))
                 }
             val machine = createMachine(repo, summary)
-            machine.state.first { it is PrDetailState.Content }
-
-            launch { machine.dispatch(PrDetailAction.Reject) }
-
+            var dispatched = false
             val withErr =
                 machine.state
-                    .filter {
+                    .onEach { s ->
+                        if (s is PrDetailState.Content) {
+                            val c = s as PrDetailState.Content
+                            if (!dispatched && c.voteErrorMessage == null && !c.isVoting) {
+                                dispatched = true
+                                launch { machine.dispatch(PrDetailAction.Reject) }
+                            }
+                        }
+                    }.first {
                         it is PrDetailState.Content &&
                             (it as PrDetailState.Content).voteErrorMessage != null
-                    }.first()
+                    }
             assertEquals("no permission", assertIs<PrDetailState.Content>(withErr).voteErrorMessage)
         }
+    }
 
     @Test
-    fun reloadFromErrorReturnsToContent() =
+    fun reloadFromErrorReturnsToContent() {
         runBlocking {
             val summary = samplePullRequestSummary()
             val ok = samplePullRequestDetail(summary = summary)
@@ -108,13 +122,19 @@ class PrDetailStateMachineTest {
                     detailResult = Result.failure(Exception("first"))
                 }
             val machine = createMachine(repo, summary)
-            machine.state.first { it is PrDetailState.Error }
-
-            repo.detailResult = Result.success(ok)
-            launch { machine.dispatch(PrDetailAction.Refresh) }
-
-            assertIs<PrDetailState.Content>(machine.state.first { it is PrDetailState.Content })
+            var dispatched = false
+            val content =
+                machine.state
+                    .onEach { s ->
+                        if (s is PrDetailState.Error && !dispatched) {
+                            dispatched = true
+                            repo.detailResult = Result.success(ok)
+                            launch { machine.dispatch(PrDetailAction.Refresh) }
+                        }
+                    }.first { it is PrDetailState.Content }
+            assertIs<PrDetailState.Content>(content)
         }
+    }
 
     private fun createMachine(
         repo: StubPullRequestRepository,

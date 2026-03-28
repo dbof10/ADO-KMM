@@ -12,6 +12,7 @@ import dev.azure.desktop.domain.release.ReleaseSummary
 import dev.azure.desktop.pr.InMemoryProjectSelectionStorage
 import dev.azure.desktop.pr.StubPullRequestRepository
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -20,7 +21,7 @@ import kotlin.test.assertIs
 
 class ReleaseListStateMachineTest {
     @Test
-    fun loadsProjectsDefinitionsAndReleases() =
+    fun loadsProjectsDefinitionsAndReleases() {
         runBlocking {
             val prRepo =
                 StubPullRequestRepository().apply {
@@ -70,9 +71,10 @@ class ReleaseListStateMachineTest {
             assertEquals(9, r.selectedDefinitionId)
             assertEquals(100, r.releases.single().id)
         }
+    }
 
     @Test
-    fun projectsErrorRetryProjectsReloads() =
+    fun projectsErrorRetryProjectsReloads() {
         runBlocking {
             val prRepo = StubPullRequestRepository()
             prRepo.projectsResult = Result.failure(Exception("net"))
@@ -88,32 +90,40 @@ class ReleaseListStateMachineTest {
                     incrementProjectSelectionUseCase = IncrementProjectSelectionUseCase(storage),
                 )
 
-            machine.state.first { it is ReleaseListState.ProjectsError }
-
-            prRepo.projectsResult = Result.success(listOf(DevOpsProject("1", "P")))
-            relRepo.definitionsResult =
-                Result.success(listOf(ReleaseDefinitionSummary(1, "D", null)))
-            relRepo.releasesResult =
-                Result.success(
-                    listOf(
-                        ReleaseSummary(
-                            id = 1,
-                            name = "R",
-                            status = null,
-                            definitionId = 1,
-                            definitionName = "D",
-                            projectName = "P",
-                            createdOnIso = null,
-                            commitShort = null,
-                            branchLabel = null,
-                            stages = emptyList(),
-                        ),
-                    ),
-                )
-            launch { machine.dispatch(ReleaseListAction.RetryProjects) }
-
-            assertIs<ReleaseListState.Ready>(machine.state.first { it is ReleaseListState.Ready })
+            var dispatched = false
+            val ready =
+                machine.state
+                    .onEach { s ->
+                        if (s is ReleaseListState.ProjectsError) {
+                            if (!dispatched) {
+                                dispatched = true
+                                prRepo.projectsResult = Result.success(listOf(DevOpsProject("1", "P")))
+                                relRepo.definitionsResult =
+                                    Result.success(listOf(ReleaseDefinitionSummary(1, "D", null)))
+                                relRepo.releasesResult =
+                                    Result.success(
+                                        listOf(
+                                            ReleaseSummary(
+                                                id = 1,
+                                                name = "R",
+                                                status = null,
+                                                definitionId = 1,
+                                                definitionName = "D",
+                                                projectName = "P",
+                                                createdOnIso = null,
+                                                commitShort = null,
+                                                branchLabel = null,
+                                                stages = emptyList(),
+                                            ),
+                                        ),
+                                    )
+                                launch { machine.dispatch(ReleaseListAction.RetryProjects) }
+                            }
+                        }
+                    }.first { it is ReleaseListState.Ready }
+            assertIs<ReleaseListState.Ready>(ready)
         }
+    }
 }
 
 private class StubReleaseRepository : ReleaseRepository {

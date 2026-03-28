@@ -18,3 +18,32 @@ tasks.register("compileAllTargets") {
         ":composeApp:compileKotlinIosArm64",
     )
 }
+
+tasks.register("testAllTargets") {
+    group = "verification"
+    description =
+        "Runs JVM unit tests, composeApp desktop tests, and Android debug unit tests for all KMP modules. " +
+            "(iOS Simulator tests are in testIosSimulatorArm64All; they can hang or be slow in some environments.)"
+    dependsOn(
+        ":common:jvmTest",
+        ":feature-login:jvmTest",
+        ":feature-pr:jvmTest",
+        ":composeApp:desktopTest",
+        ":common:testDebugUnitTest",
+        ":feature-login:testDebugUnitTest",
+        ":feature-pr:testDebugUnitTest",
+        ":composeApp:testDebugUnitTest",
+    )
+}
+
+tasks.register("testIosSimulatorArm64All") {
+    group = "verification"
+    description =
+        "Runs Kotlin/Native unit tests on iOS Simulator arm64 for all KMP modules (requires Xcode/simulator; may be slow)."
+    dependsOn(
+        ":common:iosSimulatorArm64Test",
+        ":feature-login:iosSimulatorArm64Test",
+        ":feature-pr:iosSimulatorArm64Test",
+        ":composeApp:iosSimulatorArm64Test",
+    )
+}

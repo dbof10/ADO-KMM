@@ -11,8 +11,8 @@ import dev.azure.desktop.domain.pr.ListProjectsUseCase
 import dev.azure.desktop.pr.InMemoryProjectSelectionStorage
 import dev.azure.desktop.pr.StubPullRequestRepository
 import dev.azure.desktop.pr.samplePullRequestSummary
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -23,7 +23,7 @@ import kotlin.test.assertNull
 
 class PrListStateMachineTest {
     @Test
-    fun loadsProjectsAndPullRequestsIntoReady() =
+    fun loadsProjectsAndPullRequestsIntoReady() {
         runBlocking {
             val selection = InMemoryProjectSelectionStorage()
             IncrementProjectSelectionUseCase(selection)("org", "Alpha")
@@ -52,28 +52,36 @@ class PrListStateMachineTest {
             assertEquals("Alpha", r.selectedProjectName)
             assertEquals(7, r.items.single().id)
         }
+    }
 
     @Test
-    fun projectsFailureThenRetryRecovers() =
+    fun projectsFailureThenRetryRecovers() {
         runBlocking {
             val repo = StubPullRequestRepository()
             repo.projectsResult = Result.failure(Exception("offline"))
             val machine = createMachine(repo, InMemoryProjectSelectionStorage())
 
-            val err = machine.state.first { it is PrListState.ProjectsError }
-            assertEquals("offline", assertIs<PrListState.ProjectsError>(err).message)
-
-            repo.projectsResult =
-                Result.success(listOf(DevOpsProject("1", "Solo")))
-            repo.myPrsResult = Result.success(emptyList())
-            launch { machine.dispatch(PrListAction.RetryProjects) }
-
-            val ready = machine.state.first { it is PrListState.Ready }
+            var dispatched = false
+            val ready =
+                machine.state
+                    .onEach { s ->
+                        if (s is PrListState.ProjectsError) {
+                            assertEquals("offline", s.message)
+                            if (!dispatched) {
+                                dispatched = true
+                                repo.projectsResult =
+                                    Result.success(listOf(DevOpsProject("1", "Solo")))
+                                repo.myPrsResult = Result.success(emptyList())
+                                launch { machine.dispatch(PrListAction.RetryProjects) }
+                            }
+                        }
+                    }.first { it is PrListState.Ready }
             assertIs<PrListState.Ready>(ready)
         }
+    }
 
     @Test
-    fun openPullRequestByIdSetsPendingWhenIdInCurrentList() =
+    fun openPullRequestByIdSetsPendingWhenIdInCurrentList() {
         runBlocking {
             val pr = samplePullRequestSummary(id = 99)
             val repo =
@@ -82,21 +90,29 @@ class PrListStateMachineTest {
                     myPrsResult = Result.success(listOf(pr))
                 }
             val machine = createMachine(repo, InMemoryProjectSelectionStorage())
-            machine.state.first { it is PrListState.Ready }
-
-            launch { machine.dispatch(PrListAction.OpenPullRequestById(99)) }
-
+            var dispatched = false
             val withPending =
                 machine.state
-                    .filter { it is PrListState.Ready && (it as PrListState.Ready).pendingOpenPullRequest != null }
-                    .first()
+                    .onEach { s ->
+                        if (s is PrListState.Ready) {
+                            val r = s as PrListState.Ready
+                            if (!dispatched && r.pendingOpenPullRequest == null) {
+                                dispatched = true
+                                launch { machine.dispatch(PrListAction.OpenPullRequestById(99)) }
+                            }
+                        }
+                    }.first {
+                        it is PrListState.Ready &&
+                            (it as PrListState.Ready).pendingOpenPullRequest != null
+                    }
             val snap = assertIs<PrListState.Ready>(withPending)
             assertEquals(99, snap.pendingOpenPullRequest?.id)
             assertNull(snap.openPullRequestError)
         }
+    }
 
     @Test
-    fun selectTabSwitchesToActivePullRequests() =
+    fun selectTabSwitchesToActivePullRequests() {
         runBlocking {
             val repo =
                 StubPullRequestRepository().apply {
@@ -106,19 +122,26 @@ class PrListStateMachineTest {
                         Result.success(listOf(samplePullRequestSummary(id = 2, projectName = "P")))
                 }
             val machine = createMachine(repo, InMemoryProjectSelectionStorage())
-            machine.state.first { it is PrListState.Ready }
-
-            launch { machine.dispatch(PrListAction.SelectTab(PrListTab.Active)) }
-
+            var dispatched = false
             val ready =
                 machine.state
-                    .filter { it is PrListState.Ready && (it as PrListState.Ready).tab == PrListTab.Active }
-                    .first()
+                    .onEach { s ->
+                        if (s is PrListState.Ready) {
+                            val r = s as PrListState.Ready
+                            if (!dispatched && r.tab == PrListTab.Mine) {
+                                dispatched = true
+                                launch { machine.dispatch(PrListAction.SelectTab(PrListTab.Active)) }
+                            }
+                        }
+                    }.first {
+                        it is PrListState.Ready && (it as PrListState.Ready).tab == PrListTab.Active
+                    }
             assertEquals(2, assertIs<PrListState.Ready>(ready).items.single().id)
         }
+    }
 
     @Test
-    fun openPullRequestByIdUsesGetByIdWhenNotInList() =
+    fun openPullRequestByIdUsesGetByIdWhenNotInList() {
         runBlocking {
             val fetched = samplePullRequestSummary(id = 5, projectName = "P")
             val repo =
@@ -127,19 +150,29 @@ class PrListStateMachineTest {
                     myPrsResult = Result.success(emptyList())
                     summaryByIdResult = Result.success(fetched)
                 }
-            val machine = createMachine(repo, InMemoryProjectSelectionStorage())
-            machine.state.first { it is PrListState.Ready }
-
-            launch { machine.dispatch(PrListAction.OpenPullRequestById(5)) }
-
+            val storage = InMemoryProjectSelectionStorage()
+            IncrementProjectSelectionUseCase(storage)("org", "P")
+            val machine = createMachine(repo, storage)
+            var dispatched = false
             val snap =
                 assertIs<PrListState.Ready>(
                     machine.state
-                        .filter { it is PrListState.Ready && (it as PrListState.Ready).pendingOpenPullRequest?.id == 5 }
-                        .first(),
+                        .onEach { s ->
+                            if (s is PrListState.Ready) {
+                                val r = s as PrListState.Ready
+                                if (!dispatched) {
+                                    dispatched = true
+                                    launch { machine.dispatch(PrListAction.OpenPullRequestById(5)) }
+                                }
+                            }
+                        }.first {
+                            it is PrListState.Ready &&
+                                (it as PrListState.Ready).pendingOpenPullRequest?.id == 5
+                        },
                 )
             assertNotNull(snap.pendingOpenPullRequest)
         }
+    }
 
     private fun createMachine(
         repo: StubPullRequestRepository,

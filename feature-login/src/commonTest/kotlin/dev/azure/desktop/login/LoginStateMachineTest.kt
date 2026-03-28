@@ -3,8 +3,8 @@ package dev.azure.desktop.login
 import dev.azure.desktop.domain.auth.PatStorage
 import dev.azure.desktop.domain.auth.PatVerifier
 import dev.azure.desktop.domain.auth.VerifyAndStorePatUseCase
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -13,7 +13,7 @@ import kotlin.test.assertIs
 
 class LoginStateMachineTest {
     @Test
-    fun submitPatEndsInSuccess() =
+    fun submitPatEndsInSuccess() {
         runBlocking {
             val useCase =
                 VerifyAndStorePatUseCase(
@@ -22,14 +22,21 @@ class LoginStateMachineTest {
                 )
             val machine = LoginStateMachine(useCase)
 
-            launch { machine.dispatch(LoginMachineAction.SubmitPat("org", "pat")) }
-
-            val end = machine.state.first { it is LoginMachineState.Success }
+            var dispatched = false
+            val end =
+                machine.state
+                    .onEach { s ->
+                        if (s is LoginMachineState.Idle && !dispatched) {
+                            dispatched = true
+                            launch { machine.dispatch(LoginMachineAction.SubmitPat("org", "pat")) }
+                        }
+                    }.first { it is LoginMachineState.Success }
             assertIs<LoginMachineState.Success>(end)
         }
+    }
 
     @Test
-    fun submitPatReturnsToIdleWithErrorWhenVerificationFails() =
+    fun submitPatReturnsToIdleWithErrorWhenVerificationFails() {
         runBlocking {
             val useCase =
                 VerifyAndStorePatUseCase(
@@ -38,14 +45,23 @@ class LoginStateMachineTest {
                 )
             val machine = LoginStateMachine(useCase)
 
-            launch { machine.dispatch(LoginMachineAction.SubmitPat("org", "pat")) }
-
+            var dispatched = false
             val errIdle =
                 machine.state
-                    .filter { it is LoginMachineState.Idle && (it as LoginMachineState.Idle).error != null }
-                    .first()
+                    .onEach { s ->
+                        if (s is LoginMachineState.Idle) {
+                            val idle = s as LoginMachineState.Idle
+                            if (!dispatched && idle.error == null) {
+                                dispatched = true
+                                launch { machine.dispatch(LoginMachineAction.SubmitPat("org", "pat")) }
+                            }
+                        }
+                    }.first {
+                        it is LoginMachineState.Idle && (it as LoginMachineState.Idle).error != null
+                    }
             assertEquals("bad token", (errIdle as LoginMachineState.Idle).error)
         }
+    }
 }
 
 private class RecordingVerifier(

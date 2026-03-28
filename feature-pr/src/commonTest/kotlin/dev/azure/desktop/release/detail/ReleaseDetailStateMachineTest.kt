@@ -6,8 +6,8 @@ import dev.azure.desktop.domain.release.ReleaseDeploymentStatus
 import dev.azure.desktop.domain.release.ReleaseDetail
 import dev.azure.desktop.domain.release.ReleaseEnvironmentInfo
 import dev.azure.desktop.domain.release.ReleaseRepository
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -17,7 +17,7 @@ import kotlin.test.assertNull
 
 class ReleaseDetailStateMachineTest {
     @Test
-    fun initialLoadShowsContent() =
+    fun initialLoadShowsContent() {
         runBlocking {
             val detail = sampleReleaseDetail()
             val repo =
@@ -29,9 +29,10 @@ class ReleaseDetailStateMachineTest {
             val content = machine.state.first { it is ReleaseDetailState.Content }
             assertEquals(detail, assertIs<ReleaseDetailState.Content>(content).detail)
         }
+    }
 
     @Test
-    fun deployEnvironmentRefreshesDetail() =
+    fun deployEnvironmentRefreshesDetail() {
         runBlocking {
             val initial =
                 sampleReleaseDetail(
@@ -67,23 +68,32 @@ class ReleaseDetailStateMachineTest {
                     deployResult = Result.success(Unit)
                 }
             val machine = createMachine(repo)
-            machine.state.first { it is ReleaseDetailState.Content }
-
-            repo.getReleaseResult = Result.success(refreshed)
-            launch { machine.dispatch(ReleaseDetailAction.DeployEnvironment(5)) }
-
+            var dispatched = false
             val end =
                 machine.state
-                    .filter {
+                    .onEach { s ->
+                        if (s is ReleaseDetailState.Content) {
+                            val c = s as ReleaseDetailState.Content
+                            if (!dispatched && !c.isDeploying &&
+                                c.detail.environments.single().status == ReleaseDeploymentStatus.NotStarted
+                            ) {
+                                dispatched = true
+                                repo.getReleaseResult = Result.success(refreshed)
+                                launch { machine.dispatch(ReleaseDetailAction.DeployEnvironment(5)) }
+                            }
+                        }
+                    }.first {
                         it is ReleaseDetailState.Content &&
                             !(it as ReleaseDetailState.Content).isDeploying &&
-                            it.detail.environments.single().status == ReleaseDeploymentStatus.InProgress
-                    }.first()
+                            (it as ReleaseDetailState.Content).detail.environments.single().status ==
+                            ReleaseDeploymentStatus.InProgress
+                    }
             assertNull(assertIs<ReleaseDetailState.Content>(end).deployError)
         }
+    }
 
     @Test
-    fun deployFailureSurfacesMessage() =
+    fun deployFailureSurfacesMessage() {
         runBlocking {
             val detail = sampleReleaseDetail()
             val repo =
@@ -92,18 +102,24 @@ class ReleaseDetailStateMachineTest {
                     deployResult = Result.failure(Exception("blocked"))
                 }
             val machine = createMachine(repo)
-            machine.state.first { it is ReleaseDetailState.Content }
-
-            launch { machine.dispatch(ReleaseDetailAction.DeployEnvironment(5)) }
-
+            var dispatched = false
             val withErr =
                 machine.state
-                    .filter {
+                    .onEach { s ->
+                        if (s is ReleaseDetailState.Content) {
+                            val c = s as ReleaseDetailState.Content
+                            if (!dispatched && !c.isDeploying && c.deployError == null) {
+                                dispatched = true
+                                launch { machine.dispatch(ReleaseDetailAction.DeployEnvironment(5)) }
+                            }
+                        }
+                    }.first {
                         it is ReleaseDetailState.Content &&
                             (it as ReleaseDetailState.Content).deployError != null
-                    }.first()
+                    }
             assertEquals("blocked", assertIs<ReleaseDetailState.Content>(withErr).deployError)
         }
+    }
 
     private fun createMachine(repo: ReleaseRepository): ReleaseDetailStateMachine =
         ReleaseDetailStateMachine(
