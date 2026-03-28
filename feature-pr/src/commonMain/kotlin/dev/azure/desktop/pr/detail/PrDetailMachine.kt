@@ -5,6 +5,7 @@ import dev.azure.desktop.domain.pr.AbandonPullRequestUseCase
 import dev.azure.desktop.domain.pr.GetPullRequestDetailUseCase
 import dev.azure.desktop.domain.pr.PullRequestDetail
 import dev.azure.desktop.domain.pr.PullRequestSummary
+import dev.azure.desktop.domain.pr.PullRequestReviewerVote
 import dev.azure.desktop.domain.pr.SetMyPullRequestVoteUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 
@@ -76,10 +77,10 @@ class PrDetailStateMachine(
                     state.override { PrDetailState.Loading }
                 }
                 on<PrDetailAction.Approve> { action, state ->
-                    return@on voteAndRefresh(state, vote = 10)
+                    return@on voteAndRefresh(state, vote = PullRequestReviewerVote.APPROVED)
                 }
                 on<PrDetailAction.Reject> { action, state ->
-                    return@on voteAndRefresh(state, vote = -10)
+                    return@on voteAndRefresh(state, vote = PullRequestReviewerVote.REJECTED)
                 }
                 on<PrDetailAction.Close> { _, state ->
                     return@on abandonAndRefresh(state)

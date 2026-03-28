@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.ModeComment
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Pending
 import androidx.compose.material.icons.outlined.Task
+import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -74,6 +75,8 @@ import dev.azure.desktop.domain.pr.PullRequestCheckState
 import dev.azure.desktop.domain.pr.PullRequestCheckStatus
 import dev.azure.desktop.domain.pr.PullRequestLinkedWorkItem
 import dev.azure.desktop.domain.pr.PullRequestReviewer
+import dev.azure.desktop.domain.pr.PullRequestReviewerVote
+import dev.azure.desktop.domain.pr.reviewerVoteDisplayLabel
 import dev.azure.desktop.domain.pr.PullRequestTimelineItem
 import dev.azure.desktop.deeplink.azureDevOpsPullRequestWebUrl
 import dev.azure.desktop.platform.pullRequestBridge
@@ -664,13 +667,7 @@ private fun formatTimelineContent(content: String): String {
     }
 }
 
-private fun voteLabel(vote: Int): String =
-    when {
-        vote >= 10 -> "Approved"
-        vote in 1..9 -> "Approved with suggestions"
-        vote < 0 -> "Rejected"
-        else -> "Waiting"
-    }
+private fun voteLabel(vote: Int): String = reviewerVoteDisplayLabel(vote)
 
 @Composable
 private fun TimelineApproval(item: PullRequestTimelineItem.Approval, compactLayout: Boolean) {
@@ -806,19 +803,32 @@ private fun PullRequestReviewer.readableName(): String {
 
 @Composable
 private fun ReviewerStatusBadge(vote: Int) {
-    val (label, tint, icon) =
-        when {
-            vote >= 10 -> Triple("Approved", EditorialColors.primary, Icons.Filled.CheckCircle)
-            vote in 1..9 -> Triple("Approved with suggestions", EditorialColors.tertiary, Icons.Outlined.Check)
-            vote < 0 -> Triple("Rejected", EditorialColors.error, Icons.Outlined.ErrorOutline)
-            else -> Triple("Waiting", EditorialColors.outline, Icons.Outlined.Schedule)
+    val label = reviewerVoteDisplayLabel(vote)
+    val (tint, icon) =
+        when (vote) {
+            in PullRequestReviewerVote.APPROVED..Int.MAX_VALUE ->
+                EditorialColors.primary to Icons.Filled.CheckCircle
+            PullRequestReviewerVote.APPROVED_WITH_SUGGESTIONS ->
+                EditorialColors.tertiary to Icons.Outlined.Check
+            PullRequestReviewerVote.REJECTED ->
+                EditorialColors.error to Icons.Outlined.ErrorOutline
+            PullRequestReviewerVote.WAITING_FOR_AUTHOR ->
+                EditorialColors.tertiary to Icons.Outlined.PersonOutline
+            PullRequestReviewerVote.NO_VOTE ->
+                EditorialColors.outline to Icons.Outlined.Schedule
+            else -> EditorialColors.outline to Icons.Outlined.Schedule
+        }
+
+    val badgeSurfaceBase =
+        when (vote) {
+            in PullRequestReviewerVote.APPROVED..Int.MAX_VALUE -> EditorialColors.primary
+            PullRequestReviewerVote.APPROVED_WITH_SUGGESTIONS -> EditorialColors.tertiary
+            else -> EditorialColors.surfaceContainerHighest
         }
 
     Surface(
         shape = RoundedCornerShape(999.dp),
-        color =
-            (if (vote >= 10) EditorialColors.primary else EditorialColors.surfaceContainerHighest)
-                .copy(alpha = 0.12f),
+        color = badgeSurfaceBase.copy(alpha = 0.12f),
         contentColor = tint,
     ) {
         Row(

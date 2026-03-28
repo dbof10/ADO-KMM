@@ -68,8 +68,10 @@ interface PullRequestRepository {
      *
      * Common values:
      * - 10: Approved
+     * - 5: Approved with suggestions
+     * - 0: No vote / waiting
+     * - -5: Waiting for author
      * - -10: Rejected
-     * - 0: Reset / waiting
      */
     suspend fun setMyPullRequestVote(
         organization: String,

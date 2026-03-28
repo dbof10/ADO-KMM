@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import dev.azure.desktop.domain.pr.reviewerVoteDisplayLabel
 import dev.azure.desktop.pr.detail.PrDetailAction
 import dev.azure.desktop.pr.detail.PrDetailState
 import dev.azure.desktop.pr.detail.PrDetailStateMachine
@@ -152,10 +153,4 @@ internal fun PrDetailScreenContent(
     }
 }
 
-private fun voteText(vote: Int): String =
-    when {
-        vote >= 10 -> "Approved"
-        vote in 1..9 -> "Approved with suggestions"
-        vote < 0 -> "Rejected"
-        else -> "Waiting"
-    }
+private fun voteText(vote: Int): String = reviewerVoteDisplayLabel(vote)

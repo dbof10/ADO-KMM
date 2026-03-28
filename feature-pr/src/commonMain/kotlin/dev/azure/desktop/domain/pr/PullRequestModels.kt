@@ -129,6 +129,28 @@ data class PullRequestReviewer(
     val vote: Int,
 )
 
+/** Azure DevOps Git pull request reviewer `vote` field values (REST API). */
+object PullRequestReviewerVote {
+    const val APPROVED = 10
+    const val APPROVED_WITH_SUGGESTIONS = 5
+    const val NO_VOTE = 0
+    const val WAITING_FOR_AUTHOR = -5
+    const val REJECTED = -10
+}
+
+/**
+ * Display label for [PullRequestReviewer.vote], matching Azure DevOps Git API values in [PullRequestReviewerVote].
+ */
+fun reviewerVoteDisplayLabel(vote: Int): String =
+    when (vote) {
+        in PullRequestReviewerVote.APPROVED..Int.MAX_VALUE -> "Approved"
+        PullRequestReviewerVote.APPROVED_WITH_SUGGESTIONS -> "Approved with suggestions"
+        PullRequestReviewerVote.NO_VOTE -> "No vote"
+        PullRequestReviewerVote.WAITING_FOR_AUTHOR -> "Waiting for author"
+        PullRequestReviewerVote.REJECTED -> "Rejected"
+        else -> "No vote"
+    }
+
 sealed class PullRequestTimelineItem {
     abstract val actorDisplayName: String
     abstract val createdDateIso: String?

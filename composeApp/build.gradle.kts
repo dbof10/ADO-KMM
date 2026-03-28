@@ -71,6 +71,10 @@ kotlin {
         iosMain.dependencies {
             implementation(compose.ui)
         }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.core)
+        }
     }
 }
 

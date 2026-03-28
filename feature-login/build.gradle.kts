@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "dev.azure.desktop"
-version = "1.0.1"
+version = "1.0.2"
 
 kotlin {
     androidTarget {
@@ -45,6 +45,10 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+        }
+        jvmTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.ktor.client.mock)
         }
     }
 }

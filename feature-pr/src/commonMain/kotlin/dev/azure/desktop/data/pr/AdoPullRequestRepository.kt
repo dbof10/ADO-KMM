@@ -11,6 +11,7 @@ import dev.azure.desktop.domain.pr.PullRequestRepository
 import dev.azure.desktop.domain.pr.PullRequestRepositoryRef
 import dev.azure.desktop.domain.pr.PullRequestSuggestion
 import dev.azure.desktop.domain.pr.PullRequestReviewer
+import dev.azure.desktop.domain.pr.PullRequestReviewerVote
 import dev.azure.desktop.domain.pr.PullRequestSummary
 import dev.azure.desktop.domain.pr.PullRequestTimelineItem
 import dev.azure.desktop.domain.pr.PrSuggestionLog
@@ -756,7 +757,7 @@ class AdoPullRequestRepository(
                 rawCommits?.let { addAll(parseCommits(it)) }
                 addAll(
                     reviewers
-                        .filter { it.vote >= 10 }
+                        .filter { it.vote >= PullRequestReviewerVote.APPROVED }
                         .map {
                             PullRequestTimelineItem.Approval(
                                 actorDisplayName = it.displayName,
