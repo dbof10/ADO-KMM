@@ -2,11 +2,14 @@ package dev.azure.desktop.pr.detail
 
 import com.freeletics.flowredux.dsl.FlowReduxStateMachine
 import dev.azure.desktop.domain.pr.AbandonPullRequestUseCase
+import dev.azure.desktop.domain.pr.EnablePullRequestAutoCompleteUseCase
 import dev.azure.desktop.domain.pr.GetPullRequestDetailUseCase
 import dev.azure.desktop.domain.pr.PullRequestDetail
+import dev.azure.desktop.domain.pr.PullRequestMergeStrategy
 import dev.azure.desktop.domain.pr.PullRequestSummary
 import dev.azure.desktop.domain.pr.PullRequestReviewerVote
 import dev.azure.desktop.domain.pr.SetMyPullRequestVoteUseCase
+import dev.azure.desktop.domain.pr.isAutoCompleteEnabled
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 sealed class PrDetailState {
@@ -18,6 +21,8 @@ sealed class PrDetailState {
         val voteErrorMessage: String? = null,
         val isClosing: Boolean = false,
         val closeErrorMessage: String? = null,
+        val isEnablingAutoComplete: Boolean = false,
+        val autoCompleteErrorMessage: String? = null,
     ) : PrDetailState()
 
     data class Error(val message: String) : PrDetailState()
@@ -28,6 +33,7 @@ sealed class PrDetailAction {
     data object Approve : PrDetailAction()
     data object Reject : PrDetailAction()
     data object Close : PrDetailAction()
+    data class EnableAutoComplete(val mergeStrategy: PullRequestMergeStrategy) : PrDetailAction()
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -37,6 +43,7 @@ class PrDetailStateMachine(
     private val getPullRequestDetailUseCase: GetPullRequestDetailUseCase,
     private val setMyPullRequestVoteUseCase: SetMyPullRequestVoteUseCase,
     private val abandonPullRequestUseCase: AbandonPullRequestUseCase,
+    private val enablePullRequestAutoCompleteUseCase: EnablePullRequestAutoCompleteUseCase,
 ) : FlowReduxStateMachine<PrDetailState, PrDetailAction>(PrDetailState.Loading) {
     init {
         spec {
@@ -85,6 +92,9 @@ class PrDetailStateMachine(
                 on<PrDetailAction.Close> { _, state ->
                     return@on abandonAndRefresh(state)
                 }
+                on<PrDetailAction.EnableAutoComplete> { action, state ->
+                    return@on enableAutoCompleteAndRefresh(state, action.mergeStrategy)
+                }
             }
             inState<PrDetailState.Error> {
                 on<PrDetailAction.Refresh> { _, state ->
@@ -99,7 +109,7 @@ class PrDetailStateMachine(
         vote: Int,
     ): com.freeletics.flowredux.dsl.ChangedState<PrDetailState> {
         val current = state.snapshot
-        if (current.isVoting || current.isClosing) return state.noChange()
+        if (current.isVoting || current.isClosing || current.isEnablingAutoComplete) return state.noChange()
         state.override { current.copy(isVoting = true, voteErrorMessage = null) }
 
         val org = organization.trim()
@@ -150,7 +160,7 @@ class PrDetailStateMachine(
         state: com.freeletics.flowredux.dsl.State<PrDetailState.Content>,
     ): com.freeletics.flowredux.dsl.ChangedState<PrDetailState> {
         val current = state.snapshot
-        if (current.isClosing || current.isVoting) return state.noChange()
+        if (current.isClosing || current.isVoting || current.isEnablingAutoComplete) return state.noChange()
         if (!current.detail.summary.status.equals("active", ignoreCase = true)) return state.noChange()
 
         state.override { current.copy(isClosing = true, closeErrorMessage = null) }
@@ -192,6 +202,73 @@ class PrDetailStateMachine(
                     current.copy(
                         isClosing = false,
                         closeErrorMessage = it.message ?: "Pull request closed, but failed to refresh detail.",
+                    )
+                }
+            },
+        )
+    }
+
+    private suspend fun enableAutoCompleteAndRefresh(
+        state: com.freeletics.flowredux.dsl.State<PrDetailState.Content>,
+        mergeStrategy: PullRequestMergeStrategy,
+    ): com.freeletics.flowredux.dsl.ChangedState<PrDetailState> {
+        val current = state.snapshot
+        if (current.isEnablingAutoComplete || current.isVoting || current.isClosing) return state.noChange()
+        if (!current.detail.summary.status.equals("active", ignoreCase = true)) return state.noChange()
+        if (current.detail.isAutoCompleteEnabled()) return state.noChange()
+
+        state.override { current.copy(isEnablingAutoComplete = true, autoCompleteErrorMessage = null) }
+
+        val org = organization.trim()
+        val enableResult =
+            enablePullRequestAutoCompleteUseCase(
+                organization = org,
+                projectName = summary.projectName,
+                repositoryId = summary.repositoryId,
+                pullRequestId = summary.id,
+                mergeStrategy = mergeStrategy,
+            )
+        if (enableResult.isFailure) {
+            return state.override {
+                val raw =
+                    enableResult.exceptionOrNull()?.message
+                        ?: "Failed to enable auto-complete."
+                val safe =
+                    raw.trim().let { text ->
+                        if (text.length > 1800) text.take(1800) + "…(truncated)" else text
+                    }
+                current.copy(
+                    isEnablingAutoComplete = false,
+                    autoCompleteErrorMessage = safe,
+                )
+            }
+        }
+
+        return getPullRequestDetailUseCase(
+            organization = org,
+            projectName = summary.projectName,
+            repositoryId = summary.repositoryId,
+            pullRequestId = summary.id,
+        ).fold(
+            onSuccess = { updated ->
+                state.override {
+                    current.copy(
+                        detail = updated,
+                        isEnablingAutoComplete = false,
+                        autoCompleteErrorMessage = null,
+                    )
+                }
+            },
+            onFailure = {
+                state.override {
+                    val raw = it.message ?: "Auto-complete enabled, but failed to refresh detail."
+                    val safe =
+                        raw.trim().let { text ->
+                            if (text.length > 1800) text.take(1800) + "…(truncated)" else text
+                        }
+                    current.copy(
+                        isEnablingAutoComplete = false,
+                        autoCompleteErrorMessage = safe,
                     )
                 }
             },

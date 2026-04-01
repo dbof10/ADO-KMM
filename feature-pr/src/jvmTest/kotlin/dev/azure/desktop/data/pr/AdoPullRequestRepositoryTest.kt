@@ -3,8 +3,11 @@ package dev.azure.desktop.data.pr
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import dev.azure.desktop.domain.pr.PullRequestMergeStrategy
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -127,5 +130,49 @@ class AdoPullRequestRepositoryTest {
             val repo = AdoPullRequestRepository(client) { "pat" }
             val prs = repo.getMyPullRequests("fabrikam", null).getOrThrow()
             assertEquals(9, prs.single().id)
+        }
+
+    @Test
+    fun enableAutoCompleteCallsConnectionDataThenPatchesAutoCompleteFields() =
+        runBlocking {
+            val connection =
+                """{"authenticatedUser":{"id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}}"""
+            var seenBody: String? = null
+            val client =
+                HttpClient(
+                    MockEngine { request ->
+                        when {
+                            request.url.encodedPath.contains("connectiondata") -> {
+                                respond(
+                                    connection,
+                                    HttpStatusCode.OK,
+                                    headersOf(HttpHeaders.ContentType, "application/json"),
+                                )
+                            }
+                            request.method == HttpMethod.Patch &&
+                                request.url.encodedPath.contains("/pullRequests/55") -> {
+                                seenBody = (request.body as TextContent).text
+                                respond(
+                                    "{}",
+                                    HttpStatusCode.OK,
+                                    headersOf(HttpHeaders.ContentType, "application/json"),
+                                )
+                            }
+                            else -> respond("unexpected", HttpStatusCode.NotFound)
+                        }
+                    },
+                )
+            val repo = AdoPullRequestRepository(client) { "pat" }
+            repo.enableAutoComplete(
+                organization = "fabrikam",
+                projectName = "Proj",
+                repositoryId = "repo-id",
+                pullRequestId = 55,
+                mergeStrategy = PullRequestMergeStrategy.Squash,
+            ).getOrThrow()
+            assertTrue(
+                seenBody!!.contains("\"autoCompleteSetBy\":{\"id\":\"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\"}") &&
+                    seenBody!!.contains("\"completionOptions\":{\"mergeStrategy\":\"squash\"}"),
+            )
         }
 }

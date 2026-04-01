@@ -92,6 +92,21 @@ interface PullRequestRepository {
     ): Result<Unit>
 
     /**
+     * Enables Azure DevOps **auto-complete** for a pull request.
+     *
+     * ADO merges the PR once policies are satisfied using [mergeStrategy].
+     *
+     * Azure DevOps REST: `Pull Requests - Update` supports updating `autoCompleteSetBy.id` and `completionOptions`.
+     */
+    suspend fun enableAutoComplete(
+        organization: String,
+        projectName: String,
+        repositoryId: String,
+        pullRequestId: Int,
+        mergeStrategy: PullRequestMergeStrategy,
+    ): Result<Unit>
+
+    /**
      * Loads binary content from a signed-in Azure DevOps HTTPS URL (e.g. PR comment image attachments).
      * Only `https://dev.azure.com/...` is accepted.
      */

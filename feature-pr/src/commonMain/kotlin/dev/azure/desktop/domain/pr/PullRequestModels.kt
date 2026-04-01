@@ -61,6 +61,41 @@ data class CreatedPullRequest(
     val repositoryId: String,
 )
 
+/**
+ * `completionOptions.mergeStrategy` when completing a pull request (Azure DevOps Git REST API).
+ * @see [Pull Requests - Update](https://learn.microsoft.com/en-us/rest/api/azure/devops/git/pull-requests/update)
+ */
+enum class PullRequestMergeStrategy(val apiValue: String) {
+    /** Merge (no fast forward) */
+    NoFastForward("noFastForward"),
+
+    /** Squash commit */
+    Squash("squash"),
+
+    /** Rebase and fast-forward */
+    Rebase("rebase"),
+
+    /** Semi-linear merge */
+    RebaseMerge("rebaseMerge"),
+}
+
+fun PullRequestMergeStrategy.uiLabel(): String =
+    when (this) {
+        PullRequestMergeStrategy.NoFastForward -> "Merge (no fast forward)"
+        PullRequestMergeStrategy.Squash -> "Squash commit"
+        PullRequestMergeStrategy.Rebase -> "Rebase and fast-forward"
+        PullRequestMergeStrategy.RebaseMerge -> "Semi-linear merge"
+    }
+
+/** Short descriptions aligned with Azure DevOps web "Complete pull request" merge type picker. */
+fun PullRequestMergeStrategy.uiDescription(): String =
+    when (this) {
+        PullRequestMergeStrategy.NoFastForward -> "Nonlinear history preserving all commits"
+        PullRequestMergeStrategy.Squash -> "Linear history with only a single commit on the target"
+        PullRequestMergeStrategy.Rebase -> "Rebase source commits onto target and fast-forward"
+        PullRequestMergeStrategy.RebaseMerge -> "Rebase source commits onto target and create a two-parent merge"
+    }
+
 data class PullRequestDetail(
     val summary: PullRequestSummary,
     val description: String?,
@@ -70,10 +105,43 @@ data class PullRequestDetail(
     val checks: List<PullRequestCheckStatus>,
     val lastMergeSourceCommitId: String?,
     val lastMergeTargetCommitId: String?,
+    val autoCompleteSetById: String? = null,
+    /**
+     * [Git pull request merge status](https://learn.microsoft.com/en-us/rest/api/azure/devops/git/pull-requests/get) —
+     * e.g. conflicts, rejectedByPolicy.
+     */
+    val mergeStatus: String? = null,
+    val isDraft: Boolean = false,
     /** Line counts vs target branch (same basis as code review); null when unavailable. */
     val linesAdded: Int? = null,
     val linesRemoved: Int? = null,
 )
+
+/**
+ * Whether the overview should offer **Merge** (approvals satisfied, PR active, merge not blocked by known status).
+ * Server policies may still block completion; the API error is shown after attempting merge.
+ */
+fun PullRequestDetail.isApprovedForMerge(): Boolean {
+    if (!summary.status.equals("active", ignoreCase = true)) return false
+    if (isDraft) return false
+    when (mergeStatus?.lowercase().orEmpty()) {
+        "conflicts", "rejectedbypolicy" -> return false
+        else -> Unit
+    }
+    if (reviewers.any { it.vote < 0 }) return false
+
+    val required = reviewers.filter { it.isRequired }
+    if (required.isNotEmpty()) {
+        return required.all { it.vote >= PullRequestReviewerVote.APPROVED_WITH_SUGGESTIONS } &&
+            reviewers.any { it.vote >= PullRequestReviewerVote.APPROVED_WITH_SUGGESTIONS }
+    }
+
+    val participated = reviewers.filter { it.vote != PullRequestReviewerVote.NO_VOTE }
+    return participated.isNotEmpty() &&
+        participated.all { it.vote >= PullRequestReviewerVote.APPROVED_WITH_SUGGESTIONS }
+}
+
+fun PullRequestDetail.isAutoCompleteEnabled(): Boolean = !autoCompleteSetById.isNullOrBlank()
 
 data class PullRequestLinkedWorkItem(
     val id: Int,
@@ -127,6 +195,7 @@ data class PullRequestReviewer(
     val displayName: String,
     val uniqueName: String?,
     val vote: Int,
+    val isRequired: Boolean = false,
 )
 
 /** Azure DevOps Git pull request reviewer `vote` field values (REST API). */

@@ -85,6 +85,7 @@ fun App() {
                     getPullRequestDetailUseCase = pullRequestBridge.getPullRequestDetailUseCase,
                     setMyPullRequestVoteUseCase = pullRequestBridge.setMyPullRequestVoteUseCase,
                     abandonPullRequestUseCase = pullRequestBridge.abandonPullRequestUseCase,
+                    enablePullRequestAutoCompleteUseCase = pullRequestBridge.enablePullRequestAutoCompleteUseCase,
                 )
             }
         }
@@ -283,6 +284,8 @@ fun App() {
                                             voteErrorMessage = current.voteErrorMessage,
                                             isClosing = current.isClosing,
                                             closeErrorMessage = current.closeErrorMessage,
+                                            isAutoCompleting = current.isEnablingAutoComplete,
+                                            autoCompleteErrorMessage = current.autoCompleteErrorMessage,
                                             onBack = {
                                                 selectedPullRequest = null
                                                 screen.value = AppScreen.PrList
@@ -290,6 +293,11 @@ fun App() {
                                             onApprove = { scope.launch { detailMachine.dispatch(PrDetailAction.Approve) } },
                                             onReject = { scope.launch { detailMachine.dispatch(PrDetailAction.Reject) } },
                                             onClosePr = { scope.launch { detailMachine.dispatch(PrDetailAction.Close) } },
+                                            onEnableAutoComplete = { strategy ->
+                                                scope.launch {
+                                                    detailMachine.dispatch(PrDetailAction.EnableAutoComplete(strategy))
+                                                }
+                                            },
                                             modifier = Modifier.fillMaxSize(),
                                         )
                                     }

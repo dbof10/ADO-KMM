@@ -8,6 +8,7 @@ import dev.azure.desktop.domain.pr.PullRequestChange
 import dev.azure.desktop.domain.pr.PullRequestDetail
 import dev.azure.desktop.domain.pr.ProjectSelectionCountStorage
 import dev.azure.desktop.domain.pr.PullRequestRepository
+import dev.azure.desktop.domain.pr.PullRequestMergeStrategy
 import dev.azure.desktop.domain.pr.PullRequestRepositoryRef
 import dev.azure.desktop.domain.pr.PullRequestSuggestion
 import dev.azure.desktop.domain.pr.PullRequestSummary
@@ -27,6 +28,7 @@ internal open class StubPullRequestRepository : PullRequestRepository {
     var fileAtCommitResult: Result<String?> = Result.success("")
     var setVoteResult: Result<Unit> = Result.success(Unit)
     var abandonResult: Result<Unit> = Result.success(Unit)
+    var enableAutoCompleteResult: Result<Unit> = Result.success(Unit)
 
     override suspend fun listProjects(organization: String): Result<List<DevOpsProject>> = projectsResult
 
@@ -103,6 +105,14 @@ internal open class StubPullRequestRepository : PullRequestRepository {
         repositoryId: String,
         pullRequestId: Int,
     ): Result<Unit> = abandonResult
+
+    override suspend fun enableAutoComplete(
+        organization: String,
+        projectName: String,
+        repositoryId: String,
+        pullRequestId: Int,
+        mergeStrategy: PullRequestMergeStrategy,
+    ): Result<Unit> = enableAutoCompleteResult
 
     override suspend fun fetchAuthenticatedDevOpsResource(url: String): Result<ByteArray> =
         Result.failure(NotImplementedError())

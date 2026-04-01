@@ -1,10 +1,15 @@
 package dev.azure.desktop.pr.detail
 
 import dev.azure.desktop.domain.pr.AbandonPullRequestUseCase
+import dev.azure.desktop.domain.pr.EnablePullRequestAutoCompleteUseCase
 import dev.azure.desktop.domain.pr.GetPullRequestDetailUseCase
 import dev.azure.desktop.domain.pr.GetPullRequestLineStatsUseCase
 import dev.azure.desktop.domain.pr.PullRequestSummary
+import dev.azure.desktop.domain.pr.PullRequestMergeStrategy
+import dev.azure.desktop.domain.pr.PullRequestReviewer
+import dev.azure.desktop.domain.pr.PullRequestReviewerVote
 import dev.azure.desktop.domain.pr.SetMyPullRequestVoteUseCase
+import dev.azure.desktop.domain.pr.isAutoCompleteEnabled
 import dev.azure.desktop.pr.StubPullRequestRepository
 import dev.azure.desktop.pr.samplePullRequestDetail
 import dev.azure.desktop.pr.samplePullRequestSummary
@@ -136,6 +141,53 @@ class PrDetailStateMachineTest {
         }
     }
 
+    @Test
+    fun enableAutoCompleteRefreshesDetail() {
+        runBlocking {
+            val summary = samplePullRequestSummary()
+            val initial =
+                samplePullRequestDetail(summary = summary).copy(
+                    reviewers =
+                        listOf(
+                            PullRequestReviewer(
+                                displayName = "A",
+                                uniqueName = null,
+                                vote = PullRequestReviewerVote.APPROVED,
+                                isRequired = true,
+                            ),
+                        ),
+                )
+            val afterAutoComplete =
+                initial.copy(
+                    autoCompleteSetById = "user-guid",
+                )
+            val repo =
+                StubPullRequestRepository().apply {
+                    detailResult = Result.success(initial)
+                    enableAutoCompleteResult = Result.success(Unit)
+                }
+            val machine = createMachine(repo, summary)
+            var dispatched = false
+            machine.state
+                .onEach { s ->
+                    if (s is PrDetailState.Content) {
+                        val c = s
+                        if (!dispatched && !c.isEnablingAutoComplete && !c.detail.isAutoCompleteEnabled()) {
+                            dispatched = true
+                            repo.detailResult = Result.success(afterAutoComplete)
+                            launch {
+                                machine.dispatch(PrDetailAction.EnableAutoComplete(PullRequestMergeStrategy.Squash))
+                            }
+                        }
+                    }
+                }.first {
+                    it is PrDetailState.Content &&
+                        !(it as PrDetailState.Content).isEnablingAutoComplete &&
+                        it.detail.isAutoCompleteEnabled()
+                }
+        }
+    }
+
     private fun createMachine(
         repo: StubPullRequestRepository,
         summary: PullRequestSummary,
@@ -148,6 +200,7 @@ class PrDetailStateMachineTest {
             getPullRequestDetailUseCase = getDetail,
             setMyPullRequestVoteUseCase = SetMyPullRequestVoteUseCase(repo),
             abandonPullRequestUseCase = AbandonPullRequestUseCase(repo),
+            enablePullRequestAutoCompleteUseCase = EnablePullRequestAutoCompleteUseCase(repo),
         )
     }
 }

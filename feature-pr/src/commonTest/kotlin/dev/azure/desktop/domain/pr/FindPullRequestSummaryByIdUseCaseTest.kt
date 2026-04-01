@@ -146,6 +146,14 @@ private class SearchRepository : PullRequestRepository {
         pullRequestId: Int,
     ): Result<Unit> = Result.failure(NotImplementedError("unused"))
 
+    override suspend fun enableAutoComplete(
+        organization: String,
+        projectName: String,
+        repositoryId: String,
+        pullRequestId: Int,
+        mergeStrategy: PullRequestMergeStrategy,
+    ): Result<Unit> = Result.failure(NotImplementedError("unused"))
+
     override suspend fun fetchAuthenticatedDevOpsResource(url: String): Result<ByteArray> =
         Result.failure(NotImplementedError("unused"))
 }

@@ -14,8 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -38,10 +38,12 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -58,6 +60,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -71,6 +74,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.azure.desktop.domain.pr.PullRequestDetail
+import dev.azure.desktop.domain.pr.PullRequestMergeStrategy
 import dev.azure.desktop.domain.pr.PullRequestCheckState
 import dev.azure.desktop.domain.pr.PullRequestCheckStatus
 import dev.azure.desktop.domain.pr.PullRequestLinkedWorkItem
@@ -78,6 +82,9 @@ import dev.azure.desktop.domain.pr.PullRequestReviewer
 import dev.azure.desktop.domain.pr.PullRequestReviewerVote
 import dev.azure.desktop.domain.pr.reviewerVoteDisplayLabel
 import dev.azure.desktop.domain.pr.PullRequestTimelineItem
+import dev.azure.desktop.domain.pr.isAutoCompleteEnabled
+import dev.azure.desktop.domain.pr.uiDescription
+import dev.azure.desktop.domain.pr.uiLabel
 import dev.azure.desktop.deeplink.azureDevOpsPullRequestWebUrl
 import dev.azure.desktop.platform.pullRequestBridge
 import dev.azure.desktop.pr.review.CodeReviewStateMachine
@@ -96,10 +103,13 @@ fun PrOverviewScreen(
     voteErrorMessage: String?,
     isClosing: Boolean,
     closeErrorMessage: String?,
+    isAutoCompleting: Boolean,
+    autoCompleteErrorMessage: String?,
     onBack: () -> Unit,
     onApprove: () -> Unit,
     onReject: () -> Unit,
     onClosePr: () -> Unit,
+    onEnableAutoComplete: (PullRequestMergeStrategy) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(
@@ -117,10 +127,13 @@ fun PrOverviewScreen(
                 voteErrorMessage = voteErrorMessage,
                 isClosing = isClosing,
                 closeErrorMessage = closeErrorMessage,
+                isAutoCompleting = isAutoCompleting,
+                autoCompleteErrorMessage = autoCompleteErrorMessage,
                 onBack = onBack,
                 onApprove = onApprove,
                 onReject = onReject,
                 onClosePr = onClosePr,
+                onEnableAutoComplete = onEnableAutoComplete,
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
@@ -132,10 +145,13 @@ fun PrOverviewScreen(
                 voteErrorMessage = voteErrorMessage,
                 isClosing = isClosing,
                 closeErrorMessage = closeErrorMessage,
+                isAutoCompleting = isAutoCompleting,
+                autoCompleteErrorMessage = autoCompleteErrorMessage,
                 onBack = onBack,
                 onApprove = onApprove,
                 onReject = onReject,
                 onClosePr = onClosePr,
+                onEnableAutoComplete = onEnableAutoComplete,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -151,15 +167,23 @@ internal fun PrOverviewScreenContent(
     voteErrorMessage: String?,
     isClosing: Boolean,
     closeErrorMessage: String?,
+    isAutoCompleting: Boolean,
+    autoCompleteErrorMessage: String?,
     onBack: () -> Unit,
     onApprove: () -> Unit,
     onReject: () -> Unit,
     onClosePr: () -> Unit,
+    onEnableAutoComplete: (PullRequestMergeStrategy) -> Unit,
     modifier: Modifier = Modifier,
     compactLayout: Boolean,
 ) {
     val summary = detail.summary
-    val reviewActionsEnabled = summary.status.equals("active", ignoreCase = true) && !isVoting && !isClosing
+    val reviewActionsEnabled =
+        summary.status.equals("active", ignoreCase = true) && !isVoting && !isClosing && !isAutoCompleting
+    val showAutoComplete =
+        summary.status.equals("active", ignoreCase = true) && !detail.isAutoCompleteEnabled()
+    val autoCompleteActionsEnabled = showAutoComplete && reviewActionsEnabled
+    var showAutoCompleteDialog by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
     val prWebUrl =
         azureDevOpsPullRequestWebUrl(
@@ -271,6 +295,32 @@ internal fun PrOverviewScreenContent(
                         }
                     }
                 }
+                if (detail.isAutoCompleteEnabled()) {
+                    Spacer(Modifier.height(12.dp))
+                    Surface(
+                        color = EditorialColors.primary.copy(alpha = 0.10f),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                tint = EditorialColors.primary,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Text(
+                                "Auto-complete is enabled for this pull request.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = EditorialColors.onSurface,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                }
                 Spacer(Modifier.height(16.dp))
                 if (compactLayout) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -305,6 +355,15 @@ internal fun PrOverviewScreenContent(
                         ) {
                             Text(if (isClosing) "Closing…" else "Close PR")
                         }
+                        if (showAutoComplete) {
+                            Button(
+                                onClick = { showAutoCompleteDialog = true },
+                                enabled = autoCompleteActionsEnabled,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("Auto-complete")
+                            }
+                        }
                     }
                 } else {
                     Row(
@@ -335,6 +394,14 @@ internal fun PrOverviewScreenContent(
                             ) {
                                 Text("Approve")
                             }
+                            if (showAutoComplete) {
+                                Button(
+                                    onClick = { showAutoCompleteDialog = true },
+                                    enabled = autoCompleteActionsEnabled,
+                                ) {
+                                    Text("Auto-complete")
+                                }
+                            }
                         }
                     }
                 }
@@ -354,7 +421,42 @@ internal fun PrOverviewScreenContent(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
+                if (!autoCompleteErrorMessage.isNullOrBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        autoCompleteErrorMessage,
+                        color = EditorialColors.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                if (isAutoCompleting) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = EditorialColors.primary,
+                        )
+                        Text(
+                            "Enabling auto-complete…",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = EditorialColors.onSurfaceVariant,
+                        )
+                    }
+                }
             }
+            SetAutoCompleteDialog(
+                visible = showAutoCompleteDialog,
+                onDismiss = { showAutoCompleteDialog = false },
+                onConfirm = { strategy ->
+                    showAutoCompleteDialog = false
+                    onEnableAutoComplete(strategy)
+                },
+            )
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = EditorialColors.surfaceContainerLow,
@@ -425,6 +527,83 @@ internal fun PrOverviewScreenContent(
                     }
             }
         }
+}
+
+@Composable
+private fun SetAutoCompleteDialog(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (PullRequestMergeStrategy) -> Unit,
+) {
+    if (!visible) return
+    var selectedStrategy by remember { mutableStateOf(PullRequestMergeStrategy.Squash) }
+    val optionScroll = rememberScrollState()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "Set auto-complete",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+            )
+        },
+        text = {
+            Column(Modifier.verticalScroll(optionScroll)) {
+                Text(
+                    "When this pull request can merge, Azure DevOps will complete it automatically using the merge type below.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = EditorialColors.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Merge type",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = EditorialColors.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(10.dp))
+                PullRequestMergeStrategy.entries.forEach { strategy ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = strategy == selectedStrategy,
+                                onClick = { selectedStrategy = strategy },
+                                role = Role.RadioButton,
+                            )
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = strategy == selectedStrategy,
+                            onClick = null,
+                        )
+                        Column(Modifier.padding(start = 8.dp)) {
+                            Text(
+                                strategy.uiLabel(),
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                strategy.uiDescription(),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = EditorialColors.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(selectedStrategy) }) {
+                Text("Enable auto-complete")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
 }
 
 @Composable

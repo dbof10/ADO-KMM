@@ -40,6 +40,7 @@ actual val pullRequestBridge: PullRequestBridge =
         override val getPullRequestDetailUseCase get() = IosPullRequestServices.getPullRequestDetailUseCase
         override val setMyPullRequestVoteUseCase get() = IosPullRequestServices.setMyPullRequestVoteUseCase
         override val abandonPullRequestUseCase get() = IosPullRequestServices.abandonPullRequestUseCase
+        override val enablePullRequestAutoCompleteUseCase get() = IosPullRequestServices.enablePullRequestAutoCompleteUseCase
         override val getPullRequestFileDiffUseCase get() = IosPullRequestServices.getPullRequestFileDiffUseCase
 
         override suspend fun getPullRequestChanges(

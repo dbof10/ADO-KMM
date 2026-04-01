@@ -18,6 +18,7 @@ import dev.azure.desktop.domain.pr.CreatePullRequestUseCase
 import dev.azure.desktop.domain.pr.ListProjectsUseCase
 import dev.azure.desktop.domain.pr.PullRequestChange
 import dev.azure.desktop.domain.pr.AbandonPullRequestUseCase
+import dev.azure.desktop.domain.pr.EnablePullRequestAutoCompleteUseCase
 import dev.azure.desktop.domain.pr.SetMyPullRequestVoteUseCase
 import dev.azure.desktop.domain.release.CreateReleaseUseCase
 import dev.azure.desktop.domain.release.DeployReleaseEnvironmentUseCase
@@ -49,6 +50,7 @@ interface PullRequestBridge {
     val getPullRequestDetailUseCase: GetPullRequestDetailUseCase
     val setMyPullRequestVoteUseCase: SetMyPullRequestVoteUseCase
     val abandonPullRequestUseCase: AbandonPullRequestUseCase
+    val enablePullRequestAutoCompleteUseCase: EnablePullRequestAutoCompleteUseCase
     val getPullRequestFileDiffUseCase: GetPullRequestFileDiffUseCase
 
     suspend fun getPullRequestChanges(

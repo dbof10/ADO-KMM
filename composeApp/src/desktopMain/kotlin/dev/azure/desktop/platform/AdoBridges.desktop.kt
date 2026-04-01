@@ -35,6 +35,7 @@ actual val pullRequestBridge: PullRequestBridge =
         override val getPullRequestDetailUseCase get() = JvmPullRequestServices.getPullRequestDetailUseCase
         override val setMyPullRequestVoteUseCase get() = JvmPullRequestServices.setMyPullRequestVoteUseCase
         override val abandonPullRequestUseCase get() = JvmPullRequestServices.abandonPullRequestUseCase
+        override val enablePullRequestAutoCompleteUseCase get() = JvmPullRequestServices.enablePullRequestAutoCompleteUseCase
         override val getPullRequestFileDiffUseCase get() = JvmPullRequestServices.getPullRequestFileDiffUseCase
 
         override suspend fun getPullRequestChanges(

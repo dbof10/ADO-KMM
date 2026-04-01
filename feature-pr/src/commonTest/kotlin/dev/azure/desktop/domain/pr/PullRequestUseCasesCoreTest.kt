@@ -28,6 +28,12 @@ class PullRequestUseCasesCoreTest {
 
         assertTrue(AbandonPullRequestUseCase(repository)(" org ", "project", "repo", 7).isSuccess)
         assertEquals(7, repository.lastAbandonPullRequestId)
+
+        assertTrue(
+            EnablePullRequestAutoCompleteUseCase(repository)(" org ", "project", "repo", 7, PullRequestMergeStrategy.Squash).isSuccess,
+        )
+        assertEquals(7, repository.lastEnableAutoCompletePullRequestId)
+        assertEquals(PullRequestMergeStrategy.Squash, repository.lastMergeStrategy)
     }
 }
 
@@ -36,6 +42,8 @@ private class RecordingPullRequestRepository : PullRequestRepository {
     var lastProjectName: String? = null
     var lastPullRequestId: Int? = null
     var lastAbandonPullRequestId: Int? = null
+    var lastEnableAutoCompletePullRequestId: Int? = null
+    var lastMergeStrategy: PullRequestMergeStrategy? = null
     var lastVote: Int? = null
 
     override suspend fun listProjects(organization: String): Result<List<DevOpsProject>> {
@@ -148,6 +156,21 @@ private class RecordingPullRequestRepository : PullRequestRepository {
         lastProjectName = projectName
         lastPullRequestId = pullRequestId
         lastAbandonPullRequestId = pullRequestId
+        return Result.success(Unit)
+    }
+
+    override suspend fun enableAutoComplete(
+        organization: String,
+        projectName: String,
+        repositoryId: String,
+        pullRequestId: Int,
+        mergeStrategy: PullRequestMergeStrategy,
+    ): Result<Unit> {
+        lastOrganization = organization
+        lastProjectName = projectName
+        lastPullRequestId = pullRequestId
+        lastEnableAutoCompletePullRequestId = pullRequestId
+        lastMergeStrategy = mergeStrategy
         return Result.success(Unit)
     }
 

@@ -13,7 +13,9 @@ import dev.azure.desktop.domain.pr.PullRequestSuggestion
 import dev.azure.desktop.domain.pr.PullRequestReviewer
 import dev.azure.desktop.domain.pr.PullRequestReviewerVote
 import dev.azure.desktop.domain.pr.PullRequestSummary
+import dev.azure.desktop.domain.pr.PullRequestMergeStrategy
 import dev.azure.desktop.domain.pr.PullRequestTimelineItem
+import dev.azure.desktop.domain.pr.AdoNetworkLog
 import dev.azure.desktop.domain.pr.PrSuggestionLog
 import dev.azure.desktop.domain.pr.CreatePullRequestParams
 import dev.azure.desktop.domain.pr.CreatedPullRequest
@@ -39,6 +41,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
@@ -707,6 +710,58 @@ class AdoPullRequestRepository(
             }
         }
 
+    override suspend fun enableAutoComplete(
+        organization: String,
+        projectName: String,
+        repositoryId: String,
+        pullRequestId: Int,
+        mergeStrategy: PullRequestMergeStrategy,
+    ): Result<Unit> =
+        runCatching {
+            require(organization.isNotBlank()) { "Missing organization." }
+            require(projectName.isNotBlank()) { "Missing project name." }
+            require(repositoryId.isNotBlank()) { "Missing repository id." }
+            require(pullRequestId > 0) { "Invalid pull request id." }
+
+            val url =
+                "https://$Host/${organization.encodeURLPathPart()}/${projectName.encodeURLPathPart()}/" +
+                    "_apis/git/repositories/${repositoryId.encodeURLPathPart()}/pullRequests/$pullRequestId" +
+                    "?api-version=$ApiVersion"
+
+            val userId = getAuthenticatedUserId(organization)
+            val strategy = mergeStrategy.apiValue
+            val body =
+                """{"autoCompleteSetBy":{"id":"${userId.escapeJson()}"},"completionOptions":{"mergeStrategy":"${strategy.escapeJson()}"}}"""
+
+            AdoNetworkLog.d("PATCH enable auto-complete PR pullRequestId=$pullRequestId url=${url.substringBefore("?")}?api-version=…")
+            AdoNetworkLog.d("request body=$body")
+
+            val response =
+                httpClient.request(url) {
+                    method = HttpMethod.Patch
+                    headers.append(HttpHeaders.Authorization, basicAuth())
+                    contentType(ContentType.Application.Json)
+                    setBody(body)
+                }
+
+            if (!response.status.isSuccess()) {
+                val errBody =
+                    runCatching { response.bodyAsText() }.getOrNull().orEmpty().trim().let { text ->
+                        if (text.length > 8000) text.take(8000) + "…(truncated)" else text
+                    }
+                AdoNetworkLog.d("response ${response.status.value} body=$errBody")
+                val message =
+                    buildString {
+                        append("Unable to enable auto-complete (${response.status.value}).")
+                        if (errBody.isNotEmpty()) {
+                            append(' ')
+                            append(errBody)
+                        }
+                    }
+                error(message)
+            }
+        }
+
     override suspend fun fetchAuthenticatedDevOpsResource(url: String): Result<ByteArray> =
         runCatching {
             val trimmed = url.trim()
@@ -780,6 +835,9 @@ class AdoPullRequestRepository(
             checks = checks,
             lastMergeSourceCommitId = root["lastMergeSourceCommit"].asObjectOrNull()?.get("commitId").stringOrNull(),
             lastMergeTargetCommitId = root["lastMergeTargetCommit"].asObjectOrNull()?.get("commitId").stringOrNull(),
+            autoCompleteSetById = root["autoCompleteSetBy"].asObjectOrNull()?.get("id").stringOrNull(),
+            mergeStatus = root["mergeStatus"].stringOrNull(),
+            isDraft = root["isDraft"].jsonBooleanOrNull() == true,
         )
     }
 
@@ -931,6 +989,7 @@ private fun JsonObject.toReviewer(): PullRequestReviewer? {
         displayName = displayName,
         uniqueName = this["uniqueName"].stringOrNull(),
         vote = this["vote"].intOrNull() ?: 0,
+        isRequired = this["isRequired"].jsonBooleanOrNull() == true,
     )
 }
 
@@ -944,6 +1003,7 @@ private fun JsonElement?.intOrNull(): Int? = (this as? JsonPrimitive)?.intOrNull
 
 private fun JsonElement?.jsonBooleanOrNull(): Boolean? {
     val p = this as? JsonPrimitive ?: return null
+    p.booleanOrNull?.let { return it }
     return when (p.contentOrNull?.lowercase()) {
         "true" -> true
         "false" -> false

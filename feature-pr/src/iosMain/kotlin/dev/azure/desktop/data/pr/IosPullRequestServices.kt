@@ -17,6 +17,7 @@ import dev.azure.desktop.domain.pr.ListPullRequestBranchesUseCase
 import dev.azure.desktop.domain.pr.CreatePullRequestUseCase
 import dev.azure.desktop.domain.pr.ListProjectsUseCase
 import dev.azure.desktop.domain.pr.AbandonPullRequestUseCase
+import dev.azure.desktop.domain.pr.EnablePullRequestAutoCompleteUseCase
 import dev.azure.desktop.domain.pr.SetMyPullRequestVoteUseCase
 
 object IosPullRequestServices {
@@ -68,6 +69,8 @@ object IosPullRequestServices {
     val setMyPullRequestVoteUseCase by lazy { SetMyPullRequestVoteUseCase(repository) }
 
     val abandonPullRequestUseCase by lazy { AbandonPullRequestUseCase(repository) }
+
+    val enablePullRequestAutoCompleteUseCase by lazy { EnablePullRequestAutoCompleteUseCase(repository) }
 
     val findCreatePullRequestSuggestionUseCase by lazy { FindCreatePullRequestSuggestionUseCase(repository) }
 
